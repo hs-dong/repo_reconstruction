@@ -33,6 +33,9 @@
 
     # 使用 GitHub Token（可获取更高频率限制）
     python fetch_remote_commits.py --token ghp_xxxxxxxxxxxx
+
+    检查hsdong的仓库: python eval_script/web_app/fetch_remote_commits.py --local /ai_train/bingodong/dhs/repo_reconstruction_evaluation --branch master
+    检查Echocraft的仓库: 
 """
 
 import os
