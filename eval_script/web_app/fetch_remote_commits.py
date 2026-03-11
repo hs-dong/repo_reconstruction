@@ -34,6 +34,10 @@
     # 使用 GitHub Token（可获取更高频率限制）
     python fetch_remote_commits.py --token ghp_xxxxxxxxxxxx
 
+    # 展开 PR 内的原始 commit（查看 squash merge 之前的每个 commit）
+    python fetch_remote_commits.py --expand-pr
+    python fetch_remote_commits.py --local eval_data/EchoCraft --expand-pr --output commits.json
+
     检查hsdong的仓库: python eval_script/web_app/fetch_remote_commits.py --local /ai_train/bingodong/dhs/repo_reconstruction_evaluation --branch master
     检查Echocraft的仓库:  python eval_script/web_app/fetch_remote_commits.py --local eval_data/EchoCraft
 """
@@ -273,6 +277,72 @@ class GitHubAPIClient:
         """获取单个 commit 的详细信息（包含文件变更）"""
         data, _ = self._request(f"{self.BASE_URL}/repos/{owner}/{repo}/commits/{sha}")
         return data
+
+    def get_pr_commits(
+        self,
+        owner: str,
+        repo: str,
+        pr_number: str,
+        per_page: int = 100,
+    ) -> List[RemoteCommitInfo]:
+        """
+        获取指定 PR 内的所有 commit（展开 squash merge 之前的原始 commit）
+
+        通过 GitHub API: GET /repos/{owner}/{repo}/pulls/{pr_number}/commits
+
+        Args:
+            owner: 仓库所有者
+            repo: 仓库名称
+            pr_number: PR 编号（字符串）
+            per_page: 每页数量（最大 100）
+
+        Returns:
+            List[RemoteCommitInfo]: 该 PR 内的所有原始 commit
+        """
+        all_commits = []
+        page = 1
+
+        while True:
+            url = f"{self.BASE_URL}/repos/{owner}/{repo}/pulls/{pr_number}/commits"
+            params = {
+                "per_page": min(per_page, 100),
+                "page": page,
+            }
+
+            try:
+                data, headers = self._request(url, params)
+            except HTTPError as e:
+                if e.code == 404:
+                    print(f"  [WARN] PR #{pr_number} 未找到，可能已被删除或不存在")
+                    return []
+                raise
+            except Exception as e:
+                print(f"  [ERROR] 获取 PR #{pr_number} 的 commit 失败: {e}")
+                return []
+
+            if not data:
+                break
+
+            for item in data:
+                commit_info = _parse_api_commit(item)
+                # 标记该 commit 属于哪个 PR
+                commit_info.pr_number = pr_number
+                all_commits.append(commit_info)
+
+            # 检查是否还有下一页
+            link_header = headers.get("Link", "")
+            if 'rel="next"' not in link_header or len(data) < per_page:
+                break
+
+            page += 1
+
+            # 遵守速率限制
+            remaining = headers.get("X-RateLimit-Remaining", "999")
+            if int(remaining) < 10:
+                print(f"  [WARN] API 剩余调用次数: {remaining}，暂停 1 秒...")
+                time.sleep(1)
+
+        return all_commits
 
 
 # ==================== 本地 Git 方式 ====================
@@ -742,6 +812,13 @@ def main():
     # 认证
     parser.add_argument("--token", help="GitHub Personal Access Token (也可通过 GITHUB_TOKEN 环境变量设置)")
 
+    # PR 展开
+    parser.add_argument(
+        "--expand-pr",
+        action="store_true",
+        help="展开每个 PR 内的原始 commit（通过 GitHub API 获取 squash merge 之前的 commit 列表）",
+    )
+
     # 输出
     parser.add_argument("--output", "-o", help="输出文件路径 (支持 .json 和 .jsonl)")
     parser.add_argument("--format", choices=["json", "jsonl"], default="json", help="输出格式 (默认: json)")
@@ -831,6 +908,96 @@ def main():
             author=args.author,
         )
 
+    # ===== 展开 PR 内的 commit =====
+    expanded_commits = []
+    if args.expand_pr and commits:
+        # 收集所有有 PR 编号的 commit
+        pr_commits_map = {}
+        for c in commits:
+            if c.pr_number:
+                pr_commits_map[c.pr_number] = c
+
+        if not pr_commits_map:
+            if not args.quiet:
+                print("\n  [INFO] 没有找到包含 PR 编号的 commit，无需展开")
+        else:
+            if not args.quiet:
+                print(f"\n{'=' * 80}")
+                print(f"🔍 展开 PR 内的原始 commit（共 {len(pr_commits_map)} 个 PR）")
+                print(f"{'=' * 80}")
+
+            # 需要 GitHub API 客户端
+            # 如果是本地模式，需要从远程 URL 推断 owner/repo 或使用参数
+            api_client = GitHubAPIClient(token=args.token)
+
+            pr_owner = args.owner
+            pr_repo = args.repo
+
+            # 如果是本地模式，尝试从远程 URL 推断 owner/repo
+            if args.local:
+                local_client = LocalGitClient(args.local)
+                remote_url = local_client.get_remote_url()
+                if remote_url:
+                    # 从 URL 中提取 owner/repo
+                    # 支持格式: git@github.com:owner/repo.git 或 https://github.com/owner/repo.git
+                    url_match = re.search(r'github\.com[:/]([^/]+)/([^/.]+?)(?:\.git)?$', remote_url)
+                    if url_match:
+                        pr_owner = url_match.group(1)
+                        pr_repo = url_match.group(2)
+                        if not args.quiet:
+                            print(f"  [INFO] 从远程 URL 推断仓库: {pr_owner}/{pr_repo}")
+                    else:
+                        print(f"  [WARN] 无法从远程 URL '{remote_url}' 推断 GitHub 仓库")
+                        print(f"         使用默认值: {pr_owner}/{pr_repo}")
+                        print(f"         可通过 --owner 和 --repo 参数手动指定")
+
+            total_expanded = 0
+            for pr_num in sorted(pr_commits_map.keys(), key=lambda x: int(x), reverse=True):
+                squash_commit = pr_commits_map[pr_num]
+                if not args.quiet:
+                    print(f"\n  📦 PR #{pr_num}: {squash_commit.message[:60]}")
+
+                pr_sub_commits = api_client.get_pr_commits(
+                    owner=pr_owner,
+                    repo=pr_repo,
+                    pr_number=pr_num,
+                )
+
+                if pr_sub_commits:
+                    if not args.quiet:
+                        print(f"     └── 包含 {len(pr_sub_commits)} 个原始 commit:")
+                        for sc in pr_sub_commits:
+                            try:
+                                dt = _parse_iso_datetime(sc.commit_date)
+                                sc_date = dt.strftime("%Y-%m-%d %H:%M:%S") if dt else sc.commit_date[:19]
+                            except (ValueError, TypeError):
+                                sc_date = sc.commit_date[:19] if sc.commit_date else "-"
+                            sc_msg = sc.message[:55] if len(sc.message) <= 55 else sc.message[:52] + "..."
+                            print(f"         {sc.short_sha}  {sc_date}  {sc.author_name[:15]:<15}  {sc_msg}")
+
+                    expanded_commits.append({
+                        "pr_number": pr_num,
+                        "squash_commit": squash_commit.to_dict(),
+                        "original_commits": [sc.to_dict() for sc in pr_sub_commits],
+                        "original_commit_count": len(pr_sub_commits),
+                    })
+                    total_expanded += len(pr_sub_commits)
+                else:
+                    if not args.quiet:
+                        print(f"     └── (无法获取原始 commit，PR 可能已被删除)")
+                    expanded_commits.append({
+                        "pr_number": pr_num,
+                        "squash_commit": squash_commit.to_dict(),
+                        "original_commits": [],
+                        "original_commit_count": 0,
+                    })
+
+                # 避免触发速率限制，短暂等待
+                time.sleep(0.3)
+
+            if not args.quiet:
+                print(f"\n  📊 展开统计: {len(pr_commits_map)} 个 PR → {total_expanded} 个原始 commit")
+
     # ===== 输出结果 =====
     if not args.quiet:
         print(f"\n{'=' * 80}")
@@ -844,6 +1011,27 @@ def main():
 
     # 保存到文件
     if args.output:
+        if args.expand_pr and expanded_commits:
+            # 如果有展开的 PR 数据，保存增强版结果
+            output_data = {
+                "commits": [c.to_dict() for c in commits],
+                "expanded_prs": expanded_commits,
+                "summary": {
+                    "total_squash_commits": len(commits),
+                    "total_prs_expanded": len(expanded_commits),
+                    "total_original_commits": sum(
+                        pr["original_commit_count"] for pr in expanded_commits
+                    ),
+                },
+            }
+            # 生成展开版输出文件
+            base, ext = os.path.splitext(args.output)
+            expanded_output = f"{base}_expanded{ext}"
+            os.makedirs(os.path.dirname(os.path.abspath(expanded_output)), exist_ok=True)
+            with open(expanded_output, "w", encoding="utf-8") as f:
+                json.dump(output_data, f, ensure_ascii=False, indent=2)
+            print(f"\n  ✅ 已保存展开版 commit 到: {expanded_output}")
+
         save_commits(commits, args.output, args.format)
 
     if not args.quiet:
