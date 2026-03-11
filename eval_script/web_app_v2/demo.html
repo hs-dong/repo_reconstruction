@@ -1,0 +1,1625 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Repo Reconstruction Evaluation V2.0</title>
+    <style>
+        /* ==================== 变量系统 ==================== */
+        :root {
+            --primary: #6366f1;
+            --primary-light: #818cf8;
+            --primary-dark: #4f46e5;
+            --success: #10b981;
+            --success-light: #34d399;
+            --warning: #f59e0b;
+            --warning-light: #fbbf24;
+            --danger: #ef4444;
+            --danger-light: #f87171;
+            --info: #06b6d4;
+            --info-light: #22d3ee;
+            
+            --bg-dark: #0f0f23;
+            --bg-card: #1a1a2e;
+            --bg-elevated: #252540;
+            --bg-input: #16162a;
+            --border: rgba(255,255,255,0.08);
+            --border-light: rgba(255,255,255,0.12);
+            
+            --text: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            
+            --radius: 12px;
+            --radius-sm: 8px;
+            --radius-lg: 16px;
+            --shadow: 0 4px 24px rgba(0,0,0,0.3);
+            --shadow-lg: 0 8px 40px rgba(0,0,0,0.4);
+            
+            --font-mono: 'SF Mono', 'Fira Code', 'Monaco', monospace;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        html { font-size: 16px; scroll-behavior: smooth; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        /* ==================== 背景效果 ==================== */
+        .bg-effects {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            overflow: hidden;
+            pointer-events: none;
+        }
+        
+        .bg-effects::before {
+            content: '';
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%);
+            top: -200px;
+            right: -100px;
+            animation: float 15s ease-in-out infinite;
+        }
+        
+        .bg-effects::after {
+            content: '';
+            position: absolute;
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(6,182,212,0.1) 0%, transparent 70%);
+            bottom: -150px;
+            left: -100px;
+            animation: float 20s ease-in-out infinite reverse;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(30px, -30px); }
+        }
+
+        /* ==================== 顶部导航 ==================== */
+        .header {
+            background: rgba(26,26,46,0.9);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .header-content {
+            max-width: 1600px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--primary), var(--info));
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+        
+        .logo-text {
+            font-size: 1.125rem;
+            font-weight: 600;
+        }
+        
+        .logo-badge {
+            background: linear-gradient(135deg, var(--primary), var(--info));
+            padding: 0.25rem 0.625rem;
+            border-radius: 20px;
+            font-size: 0.6875rem;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        /* ==================== 主布局 ==================== */
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .layout {
+            display: grid;
+            grid-template-columns: 380px 1fr;
+            gap: 2rem;
+            align-items: start;
+        }
+
+        /* ==================== 侧边栏 ==================== */
+        .sidebar {
+            position: sticky;
+            top: 90px;
+        }
+        
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+        }
+        
+        .card + .card {
+            margin-top: 1.5rem;
+        }
+        
+        .card-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .card-icon {
+            width: 36px;
+            height: 36px;
+            background: var(--bg-elevated);
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary-light);
+        }
+        
+        .card-title {
+            font-size: 0.9375rem;
+            font-weight: 600;
+        }
+        
+        .card-body {
+            padding: 1.5rem;
+        }
+
+        /* ==================== 表单 ==================== */
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+        
+        .form-group:last-child {
+            margin-bottom: 0;
+        }
+        
+        .form-label {
+            display: block;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 0.875rem 1rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            font-size: 0.9375rem;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+        
+        .form-input:hover {
+            border-color: var(--border-light);
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99,102,241,0.2);
+        }
+        
+        .form-input::placeholder {
+            color: var(--text-muted);
+        }
+        
+        select.form-input {
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 1rem center;
+            padding-right: 2.5rem;
+        }
+
+        /* ==================== 按钮 ==================== */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.875rem 1.5rem;
+            font-size: 0.9375rem;
+            font-weight: 500;
+            font-family: inherit;
+            border-radius: var(--radius-sm);
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            box-shadow: 0 4px 15px rgba(99,102,241,0.3);
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(99,102,241,0.4);
+        }
+        
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+        
+        .btn-secondary {
+            background: var(--bg-elevated);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        
+        .btn-secondary:hover {
+            background: var(--bg-card);
+            border-color: var(--border-light);
+        }
+        
+        .btn-block {
+            width: 100%;
+        }
+        
+        .btn-sm {
+            padding: 0.5rem 1rem;
+            font-size: 0.8125rem;
+        }
+        
+        .btn-icon {
+            width: 40px;
+            height: 40px;
+            padding: 0;
+            border-radius: var(--radius-sm);
+        }
+
+        /* ==================== 用户列表 ==================== */
+        .user-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .user-item {
+            display: flex;
+            align-items: center;
+            gap: 0.875rem;
+            padding: 0.875rem;
+            background: var(--bg-input);
+            border: 1px solid transparent;
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .user-item:hover {
+            background: var(--bg-elevated);
+            border-color: var(--border);
+        }
+        
+        .user-item.active {
+            background: rgba(99,102,241,0.1);
+            border-color: var(--primary);
+        }
+        
+        .user-avatar {
+            width: 44px;
+            height: 44px;
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+        
+        .avatar-1 { background: linear-gradient(135deg, #667eea, #764ba2); }
+        .avatar-2 { background: linear-gradient(135deg, #f093fb, #f5576c); }
+        .avatar-3 { background: linear-gradient(135deg, #4facfe, #00f2fe); }
+        .avatar-4 { background: linear-gradient(135deg, #43e97b, #38f9d7); }
+        .avatar-5 { background: linear-gradient(135deg, #fa709a, #fee140); }
+        
+        .user-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .user-name {
+            font-weight: 500;
+            font-size: 0.9375rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .user-meta {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.125rem;
+        }
+        
+        .user-badge {
+            padding: 0.25rem 0.625rem;
+            background: var(--bg-card);
+            border-radius: 20px;
+            font-size: 0.6875rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        /* ==================== 空状态 ==================== */
+        .empty-state {
+            text-align: center;
+            padding: 5rem 2rem;
+        }
+        
+        .empty-icon {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 2rem;
+            opacity: 0.3;
+        }
+        
+        .empty-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+        }
+        
+        .empty-desc {
+            color: var(--text-secondary);
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        /* ==================== 结果区域 ==================== */
+        .result-area {
+            display: none;
+        }
+        
+        .result-area.active {
+            display: block;
+        }
+
+        /* ==================== 时间线 ==================== */
+        .timeline-card {
+            margin-bottom: 2rem;
+        }
+        
+        .timeline {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.5rem 0;
+            overflow-x: auto;
+        }
+        
+        .timeline-node {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            min-width: 120px;
+        }
+        
+        .timeline-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 3px solid var(--bg-card);
+            position: relative;
+        }
+        
+        .timeline-dot::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 100%;
+            width: 100px;
+            height: 2px;
+            background: linear-gradient(90deg, currentColor, transparent);
+            transform: translateY(-50%);
+        }
+        
+        .timeline-node:last-child .timeline-dot::after {
+            display: none;
+        }
+        
+        .timeline-dot.commit { background: var(--primary); color: var(--primary); }
+        .timeline-dot.snapshot { background: var(--success); color: var(--success); }
+        .timeline-dot.query { background: var(--info); color: var(--info); }
+        
+        .timeline-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+        
+        .timeline-time {
+            font-family: var(--font-mono);
+            font-size: 0.6875rem;
+            color: var(--text-muted);
+        }
+
+        /* ==================== 版本卡片 ==================== */
+        .version-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .version-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+        
+        .version-card:hover {
+            border-color: var(--border-light);
+            box-shadow: var(--shadow);
+        }
+        
+        .version-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--bg-elevated);
+        }
+        
+        .version-type {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .version-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+        
+        .version-icon.commit {
+            background: rgba(99,102,241,0.15);
+            color: var(--primary-light);
+        }
+        
+        .version-icon.snapshot {
+            background: rgba(16,185,129,0.15);
+            color: var(--success-light);
+        }
+        
+        .version-label {
+            font-weight: 600;
+        }
+        
+        .version-tag {
+            padding: 0.375rem 0.875rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            font-family: var(--font-mono);
+        }
+        
+        .version-tag.commit {
+            background: rgba(99,102,241,0.15);
+            color: var(--primary-light);
+        }
+        
+        .version-tag.snapshot {
+            background: rgba(16,185,129,0.15);
+            color: var(--success-light);
+        }
+        
+        .version-body {
+            padding: 1.5rem;
+        }
+        
+        .version-row {
+            display: flex;
+            margin-bottom: 1rem;
+        }
+        
+        .version-row:last-child {
+            margin-bottom: 0;
+        }
+        
+        .version-key {
+            width: 90px;
+            flex-shrink: 0;
+            font-size: 0.8125rem;
+            color: var(--text-muted);
+        }
+        
+        .version-value {
+            font-size: 0.875rem;
+            word-break: break-all;
+        }
+        
+        .version-value.mono {
+            font-family: var(--font-mono);
+            font-size: 0.8125rem;
+        }
+        
+        .version-value .status-ok {
+            color: var(--success);
+        }
+        
+        .version-value .status-fail {
+            color: var(--danger);
+        }
+
+        /* ==================== 统计面板 ==================== */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+        
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow);
+        }
+        
+        .stat-card.total::before { background: var(--primary); }
+        .stat-card.identical::before { background: var(--success); }
+        .stat-card.different::before { background: var(--warning); }
+        .stat-card.missing::before { background: var(--danger); }
+        .stat-card.similarity::before { background: var(--info); }
+        
+        .stat-value {
+            font-size: 2.25rem;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            margin-bottom: 0.25rem;
+        }
+        
+        .stat-card.total .stat-value { color: var(--primary-light); }
+        .stat-card.identical .stat-value { color: var(--success-light); }
+        .stat-card.different .stat-value { color: var(--warning-light); }
+        .stat-card.missing .stat-value { color: var(--danger-light); }
+        .stat-card.similarity .stat-value { color: var(--info-light); }
+        
+        .stat-label {
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+        }
+        
+        .stat-bar {
+            margin-top: 1rem;
+            height: 6px;
+            background: var(--bg-input);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        
+        .stat-bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.8s ease-out;
+        }
+        
+        .stat-bar-fill.success { background: linear-gradient(90deg, var(--success), var(--success-light)); }
+
+        /* ==================== 文件列表 ==================== */
+        .files-card {
+            margin-bottom: 2rem;
+        }
+        
+        .files-header {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--bg-elevated);
+        }
+        
+        .files-title {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .filter-group {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .filter-btn {
+            padding: 0.5rem 1rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            color: var(--text-secondary);
+            font-size: 0.8125rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .filter-btn:hover {
+            border-color: var(--border-light);
+            color: var(--text);
+        }
+        
+        .filter-btn.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+        
+        .files-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        
+        .file-item {
+            display: flex;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .file-item:hover {
+            background: var(--bg-elevated);
+        }
+        
+        .file-item:last-child {
+            border-bottom: none;
+        }
+        
+        .file-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            margin-right: 1rem;
+            flex-shrink: 0;
+        }
+        
+        .file-icon.py { background: rgba(59,130,246,0.15); }
+        .file-icon.js { background: rgba(250,204,21,0.15); }
+        .file-icon.md { background: rgba(148,163,184,0.15); }
+        .file-icon.json { background: rgba(16,185,129,0.15); }
+        .file-icon.default { background: var(--bg-elevated); }
+        
+        .file-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .file-path {
+            font-family: var(--font-mono);
+            font-size: 0.8125rem;
+            color: var(--primary-light);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .file-meta {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+        
+        .file-similarity {
+            padding: 0.375rem 0.75rem;
+            background: var(--bg-input);
+            border-radius: var(--radius-sm);
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-right: 1rem;
+        }
+        
+        .file-status {
+            padding: 0.375rem 0.75rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.6875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .file-status.identical {
+            background: rgba(16,185,129,0.15);
+            color: var(--success-light);
+        }
+        
+        .file-status.different {
+            background: rgba(245,158,11,0.15);
+            color: var(--warning-light);
+        }
+        
+        .file-status.missing {
+            background: rgba(239,68,68,0.15);
+            color: var(--danger-light);
+        }
+
+        /* ==================== 模态框 ==================== */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        
+        .modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.9);
+            width: 90%;
+            max-width: 1000px;
+            max-height: 80vh;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            z-index: 1001;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s;
+        }
+        
+        .modal-overlay.active + .modal {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translate(-50%, -50%) scale(1);
+        }
+        
+        .modal-header {
+            padding: 1.25rem 1.5rem;
+            background: var(--bg-elevated);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .modal-title {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .modal-close {
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .modal-close:hover {
+            background: var(--bg-card);
+            color: var(--text);
+        }
+        
+        .modal-body {
+            max-height: calc(80vh - 70px);
+            overflow-y: auto;
+        }
+        
+        .diff-view {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+        }
+        
+        .diff-pane {
+            border-right: 1px solid var(--border);
+        }
+        
+        .diff-pane:last-child {
+            border-right: none;
+        }
+        
+        .diff-pane-header {
+            padding: 0.75rem 1rem;
+            background: var(--bg-input);
+            border-bottom: 1px solid var(--border);
+            font-size: 0.75rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .diff-pane-header.left { color: var(--success-light); }
+        .diff-pane-header.right { color: var(--primary-light); }
+        
+        .diff-content {
+            font-family: var(--font-mono);
+            font-size: 0.8125rem;
+            line-height: 1.7;
+            padding: 1rem;
+            white-space: pre-wrap;
+            word-break: break-all;
+            color: var(--text-secondary);
+            min-height: 300px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        
+        .diff-line-added {
+            background: rgba(16,185,129,0.1);
+            color: var(--success-light);
+        }
+        
+        .diff-line-removed {
+            background: rgba(239,68,68,0.1);
+            color: var(--danger-light);
+        }
+
+        /* ==================== 加载动画 ==================== */
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15,15,35,0.95);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        
+        .loading-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        
+        .loading-content {
+            text-align: center;
+        }
+        
+        .loading-spinner {
+            width: 56px;
+            height: 56px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 1.5rem;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+            font-size: 1.125rem;
+            color: var(--text);
+            margin-bottom: 0.5rem;
+        }
+        
+        .loading-subtext {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        /* ==================== 通知 ==================== */
+        .toast-container {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            z-index: 3000;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        
+        .toast {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem 1.25rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-lg);
+            animation: slideIn 0.3s ease;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+        }
+        
+        .toast-icon {
+            font-size: 1.25rem;
+        }
+        
+        .toast-icon.success { color: var(--success); }
+        .toast-icon.error { color: var(--danger); }
+        .toast-icon.info { color: var(--info); }
+
+        /* ==================== 滚动条 ==================== */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: var(--bg-dark);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-light);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+
+        /* ==================== 响应式 ==================== */
+        @media (max-width: 1200px) {
+            .stats-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+        
+        @media (max-width: 1024px) {
+            .layout {
+                grid-template-columns: 1fr;
+            }
+            
+            .sidebar {
+                position: static;
+            }
+            
+            .version-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .header-actions {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 背景效果 -->
+    <div class="bg-effects"></div>
+
+    <!-- 顶部导航 -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <div class="logo-icon">R</div>
+                <span class="logo-text">Repo Reconstruction Evaluation</span>
+                <span class="logo-badge">V2.0</span>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-secondary btn-sm" onclick="loadDemoData()">
+                    📊 加载演示数据
+                </button>
+                <button class="btn btn-secondary btn-icon" title="帮助">❓</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主容器 -->
+    <div class="container">
+        <div class="layout">
+            <!-- 侧边栏 -->
+            <aside class="sidebar">
+                <!-- 查询表单卡片 -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">🔍</div>
+                        <span class="card-title">查询参数</span>
+                    </div>
+                    <div class="card-body">
+                        <form id="queryForm">
+                            <div class="form-group">
+                                <label class="form-label">选择用户</label>
+                                <select class="form-input" id="userSelect" required>
+                                    <option value="">请选择用户...</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">GitHub 用户名</label>
+                                <input type="text" class="form-input" id="githubInput" 
+                                       placeholder="输入 GitHub 用户名" required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">查询时间点</label>
+                                <input type="datetime-local" class="form-input" id="timeInput" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-block">
+                                🚀 执行查询
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- 用户列表卡片 -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">👥</div>
+                        <span class="card-title">已知用户</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="user-list" id="userList"></div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- 主内容 -->
+            <main>
+                <!-- 空状态 -->
+                <div id="emptyState" class="empty-state">
+                    <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+                        <path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                    </svg>
+                    <h2 class="empty-title">开始版本对比分析</h2>
+                    <p class="empty-desc">在左侧面板中选择用户、输入 GitHub 用户名和目标时间点，然后点击"执行查询"开始版本对比分析</p>
+                </div>
+
+                <!-- 结果区域 -->
+                <div id="resultArea" class="result-area">
+                    <!-- 时间线 -->
+                    <div class="card timeline-card">
+                        <div class="card-header">
+                            <div class="card-icon">⏱️</div>
+                            <span class="card-title">时间线视图</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="timeline" id="timeline"></div>
+                        </div>
+                    </div>
+
+                    <!-- 版本卡片 -->
+                    <div class="version-grid">
+                        <!-- Commit 版本 -->
+                        <div class="version-card">
+                            <div class="version-header">
+                                <div class="version-type">
+                                    <div class="version-icon commit">📝</div>
+                                    <span class="version-label">Commit 版本</span>
+                                </div>
+                                <span class="version-tag commit" id="commitTag">-</span>
+                            </div>
+                            <div class="version-body">
+                                <div class="version-row">
+                                    <span class="version-key">提交时间</span>
+                                    <span class="version-value" id="commitTime">-</span>
+                                </div>
+                                <div class="version-row">
+                                    <span class="version-key">提交者</span>
+                                    <span class="version-value" id="commitAuthor">-</span>
+                                </div>
+                                <div class="version-row">
+                                    <span class="version-key">提交信息</span>
+                                    <span class="version-value" id="commitMsg">-</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Require 版本 -->
+                        <div class="version-card">
+                            <div class="version-header">
+                                <div class="version-type">
+                                    <div class="version-icon snapshot">📦</div>
+                                    <span class="version-label">Require 版本 (快照)</span>
+                                </div>
+                                <span class="version-tag snapshot" id="snapshotTag">-</span>
+                            </div>
+                            <div class="version-body">
+                                <div class="version-row">
+                                    <span class="version-key">请求 ID</span>
+                                    <span class="version-value mono" id="requestId">-</span>
+                                </div>
+                                <div class="version-row">
+                                    <span class="version-key">文件数量</span>
+                                    <span class="version-value" id="fileCount">-</span>
+                                </div>
+                                <div class="version-row">
+                                    <span class="version-key">还原状态</span>
+                                    <span class="version-value" id="restoreStatus">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 统计面板 -->
+                    <div class="stats-grid">
+                        <div class="stat-card total">
+                            <div class="stat-value" id="statTotal">0</div>
+                            <div class="stat-label">总文件数</div>
+                        </div>
+                        <div class="stat-card identical">
+                            <div class="stat-value" id="statIdentical">0</div>
+                            <div class="stat-label">完全一致</div>
+                        </div>
+                        <div class="stat-card different">
+                            <div class="stat-value" id="statDifferent">0</div>
+                            <div class="stat-label">存在差异</div>
+                        </div>
+                        <div class="stat-card missing">
+                            <div class="stat-value" id="statMissing">0</div>
+                            <div class="stat-label">缺失文件</div>
+                        </div>
+                        <div class="stat-card similarity">
+                            <div class="stat-value" id="statSimilarity">0%</div>
+                            <div class="stat-label">平均相似度</div>
+                            <div class="stat-bar">
+                                <div class="stat-bar-fill success" id="simBar" style="width: 0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 文件列表 -->
+                    <div class="card files-card">
+                        <div class="files-header">
+                            <div class="files-title">
+                                📁 文件对比详情
+                            </div>
+                            <div class="filter-group">
+                                <button class="filter-btn active" onclick="filterFiles('all', this)">全部</button>
+                                <button class="filter-btn" onclick="filterFiles('different', this)">有差异</button>
+                                <button class="filter-btn" onclick="filterFiles('missing', this)">缺失</button>
+                                <button class="filter-btn" onclick="filterFiles('identical', this)">一致</button>
+                            </div>
+                        </div>
+                        <div class="files-list" id="filesList"></div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- 加载动画 -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <div class="loading-text" id="loadingText">正在查询...</div>
+            <div class="loading-subtext">请稍候</div>
+        </div>
+    </div>
+
+    <!-- 文件详情模态框 -->
+    <div class="modal-overlay" id="modalOverlay"></div>
+    <div class="modal" id="fileModal">
+        <div class="modal-header">
+            <div class="modal-title">
+                📄 <span id="modalFileName">文件详情</span>
+            </div>
+            <button class="modal-close" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="diff-view">
+                <div class="diff-pane">
+                    <div class="diff-pane-header left">📦 还原版本 (Require)</div>
+                    <div class="diff-content" id="diffLeft"></div>
+                </div>
+                <div class="diff-pane">
+                    <div class="diff-pane-header right">📝 Commit 版本</div>
+                    <div class="diff-content" id="diffRight"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast 容器 -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        // ==================== 配置数据 ====================
+        const USERS = [
+            { id: '19802552-04bf-4173-acd4-bcbd25eaa9bd', name: '杨永康', github: 'yangyongkang', avatar: 'avatar-1', count: 152 },
+            { id: 'e6e42a7f-a0ee-4e29-8f63-f3faefc54e24', name: 'chenhaokun', github: 'haokunchen', avatar: 'avatar-2', count: 58 },
+            { id: '2e1fb58b-ffa3-487f-86a6-eb613f42bc65', name: 'Xwell', github: 'xwellxia', avatar: 'avatar-3', count: 28 },
+            { id: '83902969-394d-442b-9b65-2c9ac41b60f1', name: '刘峰', github: 'neolscarlet', avatar: 'avatar-4', count: 19 },
+            { id: '3ad75b0f-ce21-41c1-8ed1-3c54b9c1c84b', name: 'aacedar', github: 'aacedar', avatar: 'avatar-5', count: 20 }
+        ];
+
+        let state = { files: [], selectedUser: null };
+
+        // ==================== 初始化 ====================
+        document.addEventListener('DOMContentLoaded', () => {
+            initUserSelect();
+            initUserList();
+            initTimeInput();
+            initForm();
+            initModal();
+        });
+
+        function initUserSelect() {
+            const select = document.getElementById('userSelect');
+            select.innerHTML = '<option value="">请选择用户...</option>' +
+                USERS.map(u => `<option value="${u.id}" data-github="${u.github}">${u.name} (${u.id.slice(0,8)}...)</option>`).join('');
+            
+            select.addEventListener('change', (e) => {
+                const opt = e.target.selectedOptions[0];
+                if (opt && opt.dataset.github) {
+                    document.getElementById('githubInput').value = opt.dataset.github;
+                }
+            });
+        }
+
+        function initUserList() {
+            const list = document.getElementById('userList');
+            list.innerHTML = USERS.map(u => `
+                <div class="user-item" data-id="${u.id}" onclick="selectUser('${u.id}')">
+                    <div class="user-avatar ${u.avatar}">${u.name[0]}</div>
+                    <div class="user-info">
+                        <div class="user-name">${u.name}</div>
+                        <div class="user-meta">@${u.github} · ${u.count} 快照</div>
+                    </div>
+                    <span class="user-badge">${u.count}</span>
+                </div>
+            `).join('');
+        }
+
+        function initTimeInput() {
+            const now = new Date();
+            const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+            document.getElementById('timeInput').value = local.toISOString().slice(0, 16);
+        }
+
+        function initForm() {
+            document.getElementById('queryForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                loadDemoData();
+            });
+        }
+
+        function initModal() {
+            document.getElementById('modalOverlay').addEventListener('click', closeModal);
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') closeModal();
+            });
+        }
+
+        // ==================== 功能函数 ====================
+        function selectUser(userId) {
+            state.selectedUser = userId;
+            const user = USERS.find(u => u.id === userId);
+            if (user) {
+                document.getElementById('userSelect').value = userId;
+                document.getElementById('githubInput').value = user.github;
+            }
+            
+            document.querySelectorAll('.user-item').forEach(item => {
+                item.classList.toggle('active', item.dataset.id === userId);
+            });
+        }
+
+        function showLoading(text = '正在加载...') {
+            document.getElementById('loadingText').textContent = text;
+            document.getElementById('loadingOverlay').classList.add('active');
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingOverlay').classList.remove('active');
+        }
+
+        function showToast(msg, type = 'info') {
+            const icons = { success: '✅', error: '❌', info: 'ℹ️' };
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerHTML = `<span class="toast-icon ${type}">${icons[type]}</span><span>${msg}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function openModal(file) {
+            document.getElementById('modalFileName').textContent = file.path;
+            document.getElementById('diffLeft').innerHTML = file.diff ? formatDiff(file.diff, 'left') : '<div style="padding:2rem;text-align:center;color:var(--text-muted);">无内容</div>';
+            document.getElementById('diffRight').innerHTML = file.diff ? formatDiff(file.diff, 'right') : '<div style="padding:2rem;text-align:center;color:var(--text-muted);">无内容</div>';
+            document.getElementById('modalOverlay').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('modalOverlay').classList.remove('active');
+        }
+
+        function formatDiff(diff, side) {
+            if (!diff) return '';
+            return diff.split('\n').map(line => {
+                if (line.startsWith('+') && !line.startsWith('+++')) {
+                    return `<div class="diff-line-added">${escapeHtml(line)}</div>`;
+                } else if (line.startsWith('-') && !line.startsWith('---')) {
+                    return `<div class="diff-line-removed">${escapeHtml(line)}</div>`;
+                }
+                return `<div>${escapeHtml(line)}</div>`;
+            }).join('');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function filterFiles(status, btn) {
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            document.querySelectorAll('.file-item').forEach(item => {
+                item.style.display = status === 'all' || item.dataset.status === status ? '' : 'none';
+            });
+        }
+
+        function getFileIcon(path) {
+            const ext = path.split('.').pop().toLowerCase();
+            const icons = { py: '🐍', js: '📜', ts: '📘', md: '📝', json: '📋', html: '🌐', css: '🎨' };
+            return icons[ext] || '📄';
+        }
+
+        function getFileIconClass(path) {
+            const ext = path.split('.').pop().toLowerCase();
+            return ['py', 'js', 'ts', 'md', 'json'].includes(ext) ? ext : 'default';
+        }
+
+        // ==================== 渲染函数 ====================
+        function renderTimeline(data) {
+            const timeline = document.getElementById('timeline');
+            timeline.innerHTML = `
+                <div class="timeline-node">
+                    <div class="timeline-dot snapshot"></div>
+                    <div class="timeline-label">快照版本</div>
+                    <div class="timeline-time">${data.snapshot.date}</div>
+                </div>
+                <div class="timeline-node">
+                    <div class="timeline-dot commit"></div>
+                    <div class="timeline-label">Commit</div>
+                    <div class="timeline-time">${data.commit.date}</div>
+                </div>
+                <div class="timeline-node">
+                    <div class="timeline-dot query"></div>
+                    <div class="timeline-label">查询时间</div>
+                    <div class="timeline-time">${document.getElementById('timeInput').value.replace('T', ' ')}</div>
+                </div>
+            `;
+        }
+
+        function renderVersionCards(data) {
+            document.getElementById('commitTag').textContent = data.commit.short_hash;
+            document.getElementById('commitTime').textContent = data.commit.date;
+            document.getElementById('commitAuthor').textContent = data.commit.author;
+            document.getElementById('commitMsg').textContent = data.commit.message;
+            
+            document.getElementById('snapshotTag').textContent = data.snapshot.date;
+            document.getElementById('requestId').textContent = data.snapshot.request_id;
+            document.getElementById('fileCount').textContent = data.snapshot.file_count + ' 个文件';
+            document.getElementById('restoreStatus').innerHTML = data.snapshot.restored 
+                ? '<span class="status-ok">✓ 还原成功</span>' 
+                : '<span class="status-fail">✗ 还原失败</span>';
+        }
+
+        function renderStats(stats) {
+            animateValue('statTotal', 0, stats.total, 800);
+            animateValue('statIdentical', 0, stats.identical, 800);
+            animateValue('statDifferent', 0, stats.different, 800);
+            animateValue('statMissing', 0, stats.missing, 800);
+            
+            setTimeout(() => {
+                document.getElementById('statSimilarity').textContent = stats.similarity.toFixed(1) + '%';
+                document.getElementById('simBar').style.width = stats.similarity + '%';
+            }, 400);
+        }
+
+        function animateValue(id, start, end, duration) {
+            const el = document.getElementById(id);
+            const range = end - start;
+            const startTime = performance.now();
+            
+            function update(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const eased = 1 - Math.pow(1 - progress, 3);
+                el.textContent = Math.round(start + range * eased);
+                if (progress < 1) requestAnimationFrame(update);
+            }
+            
+            requestAnimationFrame(update);
+        }
+
+        function renderFileList(files) {
+            state.files = files;
+            const list = document.getElementById('filesList');
+            
+            const sorted = [...files].sort((a, b) => {
+                const order = { different: 0, missing: 1, identical: 2 };
+                return order[a.status] - order[b.status];
+            });
+            
+            list.innerHTML = sorted.map(f => {
+                const statusText = { identical: '一致', different: '差异', missing: '缺失' };
+                return `
+                    <div class="file-item" data-status="${f.status}" onclick='openModal(${JSON.stringify(f).replace(/'/g, "\\'")})'>
+                        <div class="file-icon ${getFileIconClass(f.path)}">${getFileIcon(f.path)}</div>
+                        <div class="file-info">
+                            <div class="file-path">${escapeHtml(f.path)}</div>
+                            <div class="file-meta">${f.status === 'different' ? `相似度: ${(f.similarity * 100).toFixed(1)}%` : ''}</div>
+                        </div>
+                        ${f.status === 'different' ? `<span class="file-similarity">${(f.similarity * 100).toFixed(1)}%</span>` : ''}
+                        <span class="file-status ${f.status}">${statusText[f.status]}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ==================== 加载演示数据 ====================
+        function loadDemoData() {
+            showLoading('正在查询版本数据...');
+            
+            setTimeout(() => {
+                const demoData = {
+                    commit: {
+                        hash: 'a1b2c3d4e5f6g7h8',
+                        short_hash: 'a1b2c3d',
+                        date: '2026-02-04 14:25:33',
+                        author: 'xwellxia',
+                        message: 'feat: add new feature for data processing'
+                    },
+                    snapshot: {
+                        date: '20260204',
+                        request_id: '258095388aed4db486b34d389861cd90',
+                        file_count: 42,
+                        restored: true
+                    },
+                    stats: {
+                        total: 42,
+                        identical: 35,
+                        different: 5,
+                        missing: 2,
+                        similarity: 94.5
+                    },
+                    files: generateDemoFiles()
+                };
+                
+                document.getElementById('emptyState').style.display = 'none';
+                document.getElementById('resultArea').classList.add('active');
+                
+                renderTimeline(demoData);
+                renderVersionCards(demoData);
+                renderStats(demoData.stats);
+                renderFileList(demoData.files);
+                
+                hideLoading();
+                showToast('查询完成！', 'success');
+            }, 1200);
+        }
+
+        function generateDemoFiles() {
+            const files = [
+                { path: 'src/main.py', status: 'identical', similarity: 1.0 },
+                { path: 'src/utils/helper.py', status: 'different', similarity: 0.92, diff: '--- a/src/utils/helper.py\n+++ b/src/utils/helper.py\n@@ -10,3 +10,5 @@\n def helper():\n-    return "old"\n+    return "new"\n+    # Added comment' },
+                { path: 'src/api/routes.py', status: 'different', similarity: 0.85, diff: '--- a/src/api/routes.py\n+++ b/src/api/routes.py\n@@ -1,5 +1,7 @@\n from flask import Flask\n+from flask_cors import CORS\n \n app = Flask(__name__)\n+CORS(app)' },
+                { path: 'src/models/user.py', status: 'identical', similarity: 1.0 },
+                { path: 'src/models/product.py', status: 'identical', similarity: 1.0 },
+                { path: 'config/settings.py', status: 'different', similarity: 0.95, diff: '--- a/config/settings.py\n+++ b/config/settings.py\n@@ -5,1 +5,1 @@\n-DEBUG = True\n+DEBUG = False' },
+                { path: 'tests/test_main.py', status: 'missing', similarity: 0 },
+                { path: 'docs/README.md', status: 'missing', similarity: 0 },
+                { path: 'src/services/auth.py', status: 'identical', similarity: 1.0 },
+                { path: 'src/services/payment.py', status: 'different', similarity: 0.88, diff: '--- a/src/services/payment.py\n+++ b/src/services/payment.py\n@@ -20,3 +20,6 @@\n def process_payment(amount):\n     # Process payment logic\n+    if amount <= 0:\n+        raise ValueError("Invalid amount")\n     return True' },
+                { path: 'src/database/connection.py', status: 'different', similarity: 0.91, diff: '--- a/src/database/connection.py\n+++ b/src/database/connection.py\n@@ -1,4 +1,5 @@\n import pymysql\n+import os\n \n def get_connection():\n-    return pymysql.connect(host="localhost")\n+    return pymysql.connect(host=os.getenv("DB_HOST", "localhost"))' },
+                { path: 'requirements.txt', status: 'identical', similarity: 1.0 },
+                { path: 'setup.py', status: 'identical', similarity: 1.0 }
+            ];
+            
+            // 添加更多一致的文件
+            for (let i = 1; i <= 30; i++) {
+                files.push({ path: `src/modules/module_${i}.py`, status: 'identical', similarity: 1.0 });
+            }
+            
+            return files;
+        }
+    </script>
+</body>
+</html>
