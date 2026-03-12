@@ -164,6 +164,21 @@
         .stat-dot.only-actual { background: var(--accent-blue); }
         .stat-val { font-weight: 600; color: var(--text-primary); }
 
+        /* 视图切换标签样式 */
+        .view-tab {
+            background: var(--bg-tertiary); color: var(--text-secondary);
+            border: 1px solid var(--border-color); padding: 4px 10px;
+            border-radius: 4px; cursor: pointer; font-size: 0.75rem; transition: all 0.15s;
+            display: flex; align-items: center; gap: 4px;
+        }
+        .view-tab:hover { background: var(--border-color); color: var(--text-primary); }
+        .view-tab.active { background: var(--accent-blue); border-color: var(--accent-blue); color: #fff; }
+        .view-tab .badge {
+            background: rgba(255,255,255,0.2); padding: 1px 5px; border-radius: 8px;
+            font-size: 0.65rem; font-weight: 600;
+        }
+        .view-tab.active .badge { background: rgba(255,255,255,0.3); }
+
         /* ===== 右侧 - Diff 展示区 ===== */
         .content-area {
             flex: 1; display: flex; flex-direction: column; overflow: hidden;
@@ -205,6 +220,38 @@
         .diff-file-badge.identical { background: #238636; color: #fff; }
         .diff-file-badge.different { background: #9e6a03; color: #fff; }
         .diff-file-badge.missing { background: #da3633; color: #fff; }
+
+        /* Request 变更视图样式 */
+        .op-badge {
+            font-size: 0.65rem; padding: 2px 6px; border-radius: 3px; font-weight: 600;
+            text-transform: uppercase;
+        }
+        .op-badge.update { background: rgba(210,153,34,0.2); color: var(--accent-yellow); }
+        .op-badge.edit { background: rgba(210,153,34,0.2); color: var(--accent-yellow); }
+        .op-badge.write { background: rgba(63,185,80,0.2); color: var(--accent-green); }
+        .op-badge.replace { background: rgba(163,113,247,0.2); color: var(--accent-purple); }
+        .op-badge.delete { background: rgba(248,81,73,0.2); color: var(--accent-red); }
+
+        /* 单栏 diff 样式 */
+        .diff-single-wrapper { flex: 1; overflow: auto; }
+        .diff-single-table {
+            width: 100%; border-collapse: collapse;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 0.78rem; line-height: 20px;
+        }
+        .diff-single-table td { vertical-align: top; }
+        .diff-single-table .line-num {
+            width: 45px; min-width: 45px; max-width: 45px;
+            text-align: right; padding: 0 6px; color: #484f58;
+            background: var(--bg-primary); border-right: 1px solid #21262d;
+            user-select: none; font-size: 0.7rem;
+        }
+        .diff-single-table .line-content {
+            padding: 0 10px; white-space: pre-wrap; word-break: break-all;
+        }
+        .diff-line-add { background: rgba(63,185,80,0.15); }
+        .diff-line-del { background: rgba(248,81,73,0.15); }
+        .diff-line-ctx { background: var(--bg-primary); }
 
         /* 列标题 */
         .diff-column-headers {
@@ -378,6 +425,15 @@
         <div class="content-area">
             <!-- 统计栏（查询后显示） -->
             <div class="stats-bar" id="statsBar" style="display: none;">
+                <!-- 视图切换标签 -->
+                <div class="view-tabs" style="display:flex; gap:4px; margin-right: 12px; padding-right: 12px; border-right: 1px solid var(--border-color);">
+                    <button class="view-tab active" data-view="comparison" onclick="switchView('comparison', this)">
+                        <i class="bi bi-layout-split"></i> 仓库对比
+                    </button>
+                    <button class="view-tab" data-view="request_changes" onclick="switchView('request_changes', this)">
+                        <i class="bi bi-journal-code"></i> Request 变更 <span class="badge" id="changesCount">0</span>
+                    </button>
+                </div>
                 <div class="stat-chip"><div class="stat-dot identical"></div><span>Identical: <span class="stat-val" id="statIdentical">0</span></span></div>
                 <div class="stat-chip"><div class="stat-dot different"></div><span>Different: <span class="stat-val" id="statDifferent">0</span></span></div>
                 <div class="stat-chip"><div class="stat-dot missing"></div><span>Missing: <span class="stat-val" id="statMissing">0</span></span></div>
@@ -469,6 +525,10 @@
             filteredFiles: [],     // 过滤后的文件列表
             selectedFileIndex: -1, // 当前选中的文件在 filteredFiles 中的索引
             currentFilter: 'all',
+            currentView: 'comparison',  // 当前视图：comparison | request_changes
+            requestChanges: [],         // request 的变更列表
+            filteredChanges: [],        // 过滤后的变更列表
+            selectedChangeIndex: -1,    // 当前选中的变更在 filteredChanges 中的索引
         };
 
         const API_BASE = '';
@@ -601,6 +661,18 @@
                 const reason = data.compare_error || '对比过程出错';
                 showAlert(reason, 'error');
             }
+
+            // 处理 request_changes 数据
+            if (data.request_changes && data.request_changes.length > 0) {
+                state.requestChanges = data.request_changes;
+                state.filteredChanges = [...state.requestChanges];
+                state.selectedChangeIndex = -1;
+                document.getElementById('changesCount').textContent = state.requestChanges.length;
+            } else {
+                state.requestChanges = [];
+                state.filteredChanges = [];
+                document.getElementById('changesCount').textContent = '0';
+            }
         }
 
         function renderFileTree() {
@@ -647,6 +719,184 @@
             });
         }
 
+        // ==================== 视图切换 ====================
+        function switchView(view, btn) {
+            state.currentView = view;
+            // 更新标签样式
+            document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
+            btn.classList.add('active');
+
+            if (view === 'comparison') {
+                // 显示仓库对比视图
+                renderFileTree();
+                updateFilesHeaderForComparison();
+                showSelectFileHint();
+            } else if (view === 'request_changes') {
+                // 显示 Request 变更视图
+                renderChangesTree();
+                updateFilesHeaderForChanges();
+                showSelectChangeHint();
+            }
+        }
+
+        function updateFilesHeaderForComparison() {
+            document.getElementById('filesHeaderTitle').textContent = `FILES (${state.fileDetails.length})`;
+            // 恢复过滤按钮
+            const toolbar = document.querySelector('.files-toolbar');
+            toolbar.innerHTML = `
+                <button class="active" data-filter="all" onclick="filterTreeFiles('all', this)">All</button>
+                <button data-filter="different" onclick="filterTreeFiles('different', this)">Different</button>
+                <button data-filter="missing_in_actual" onclick="filterTreeFiles('missing_in_actual', this)">Missing</button>
+                <button data-filter="identical" onclick="filterTreeFiles('identical', this)">Identical</button>
+            `;
+        }
+
+        function updateFilesHeaderForChanges() {
+            document.getElementById('filesHeaderTitle').textContent = `CHANGES (${state.requestChanges.length})`;
+            // 替换为操作类型过滤按钮
+            const toolbar = document.querySelector('.files-toolbar');
+            toolbar.innerHTML = `
+                <button class="active" data-filter="all" onclick="filterChangeFiles('all', this)">All</button>
+                <button data-filter="update" onclick="filterChangeFiles('update', this)">Update</button>
+                <button data-filter="edit" onclick="filterChangeFiles('edit', this)">Edit</button>
+                <button data-filter="write" onclick="filterChangeFiles('write', this)">Write</button>
+                <button data-filter="delete" onclick="filterChangeFiles('delete', this)">Delete</button>
+            `;
+        }
+
+        function renderChangesTree() {
+            const c = document.getElementById('fileTree');
+            c.innerHTML = state.filteredChanges.map((change, idx) => {
+                const opClass = change.op_type || 'unknown';
+                const opIcon = { 'update': '✎', 'edit': '✎', 'write': '+', 'replace': '⟳', 'delete': '✗' }[change.op_type] || '?';
+                const activeClass = idx === state.selectedChangeIndex ? ' active' : '';
+                // 从 file_path 中提取相对路径（去除 workspace 前缀）
+                const filePath = change.file_path || '';
+                const displayPath = filePath.split('/').slice(-3).join('/'); // 显示最后3级路径
+                return `<div class="file-tree-item status-${opClass === 'delete' ? 'missing' : 'different'}${activeClass}" data-idx="${idx}" onclick="selectChange(${idx})">
+                    <span class="status-icon">${opIcon}</span>
+                    <span class="file-name" title="${escapeHtml(filePath)}">${escapeHtml(displayPath)}</span>
+                    <span class="op-badge ${opClass}">${change.op_type || '?'}</span>
+                </div>`;
+            }).join('');
+        }
+
+        function filterChangeFiles(opType, btn) {
+            document.querySelectorAll('.files-toolbar button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            if (opType === 'all') {
+                state.filteredChanges = [...state.requestChanges];
+            } else {
+                state.filteredChanges = state.requestChanges.filter(c => c.op_type === opType);
+            }
+            state.selectedChangeIndex = -1;
+            renderChangesTree();
+            showSelectChangeHint();
+        }
+
+        function selectChange(idx) {
+            state.selectedChangeIndex = idx;
+            // 更新高亮
+            document.querySelectorAll('.file-tree-item').forEach(i => i.classList.remove('active'));
+            const item = document.querySelector(`.file-tree-item[data-idx="${idx}"]`);
+            if (item) item.classList.add('active');
+
+            const change = state.filteredChanges[idx];
+            if (!change) return;
+
+            renderChangeDiff(change, idx);
+        }
+
+        function showSelectChangeHint() {
+            document.getElementById('selectFileHint').style.display = 'flex';
+            document.getElementById('selectFileHint').querySelector('p').textContent = '从左侧变更列表中选择一个文件查看 diff 详情';
+            document.getElementById('diffFileHeader').style.display = 'none';
+            document.getElementById('diffColumnHeaders').style.display = 'none';
+            document.getElementById('diffTableWrapper').style.display = 'none';
+        }
+
+        function renderChangeDiff(change, idx) {
+            // 隐藏提示
+            document.getElementById('emptyState').style.display = 'none';
+            document.getElementById('selectFileHint').style.display = 'none';
+
+            // 文件头
+            document.getElementById('diffFileHeader').style.display = '';
+            const filePath = change.file_path || '';
+            document.getElementById('diffFilePath').textContent = filePath;
+            const badge = document.getElementById('diffFileBadge');
+            const opBadgeMap = {
+                'update': ['UPDATE', 'different'],
+                'edit': ['EDIT', 'different'],
+                'write': ['WRITE', 'identical'],  // 用绿色
+                'replace': ['REPLACE', 'different'],
+                'delete': ['DELETE', 'missing'],
+            };
+            const [badgeText, badgeClass] = opBadgeMap[change.op_type] || [change.op_type, ''];
+            badge.textContent = badgeText;
+            badge.className = 'diff-file-badge ' + badgeClass;
+
+            // 导航索引
+            document.getElementById('fileNavIndex').textContent = `${idx + 1}/${state.filteredChanges.length}`;
+
+            // 隐藏双栏列标题，显示单栏 diff
+            document.getElementById('diffColumnHeaders').style.display = 'none';
+            document.getElementById('diffTableWrapper').style.display = '';
+
+            const diffText = change.diff || '';
+            if (!diffText.trim()) {
+                document.getElementById('diffTableWrapper').innerHTML = `<div class="identical-notice"><i class="bi bi-info-circle"></i> 无 diff 内容</div>`;
+                return;
+            }
+
+            // 渲染 unified diff
+            const diffHtml = renderUnifiedDiff(diffText);
+            document.getElementById('diffTableWrapper').innerHTML = diffHtml;
+        }
+
+        function renderUnifiedDiff(diffText) {
+            const lines = diffText.split('\n');
+            let lineNum = 0;
+            const rows = [];
+
+            for (const line of lines) {
+                if (line.startsWith('@@')) {
+                    // Hunk header - 提取起始行号
+                    const match = line.match(/@@ -(\d+)/);
+                    if (match) lineNum = parseInt(match[1]) - 1;
+                    rows.push(`<tr><td class="line-num"></td><td class="line-content diff-line-ctx" style="color:var(--accent-blue);font-weight:600;">${escapeHtml(line)}</td></tr>`);
+                } else if (line.startsWith('---') || line.startsWith('+++')) {
+                    // File header
+                    rows.push(`<tr><td class="line-num"></td><td class="line-content diff-line-ctx" style="color:var(--text-secondary);">${escapeHtml(line)}</td></tr>`);
+                } else if (line.startsWith('+')) {
+                    lineNum++;
+                    rows.push(`<tr><td class="line-num">${lineNum}</td><td class="line-content diff-line-add">${escapeHtml(line.substring(1))}</td></tr>`);
+                } else if (line.startsWith('-')) {
+                    rows.push(`<tr><td class="line-num"></td><td class="line-content diff-line-del">${escapeHtml(line.substring(1))}</td></tr>`);
+                } else if (line.startsWith(' ')) {
+                    lineNum++;
+                    rows.push(`<tr><td class="line-num">${lineNum}</td><td class="line-content diff-line-ctx">${escapeHtml(line.substring(1))}</td></tr>`);
+                } else if (line.startsWith('\\')) {
+                    // "\ No newline at end of file"
+                    rows.push(`<tr><td class="line-num"></td><td class="line-content diff-line-ctx" style="color:var(--text-secondary);font-style:italic;">${escapeHtml(line)}</td></tr>`);
+                } else if (line.trim()) {
+                    lineNum++;
+                    rows.push(`<tr><td class="line-num">${lineNum}</td><td class="line-content diff-line-ctx">${escapeHtml(line)}</td></tr>`);
+                }
+            }
+
+            return `<table class="diff-single-table"><tbody>${rows.join('')}</tbody></table>`;
+        }
+
+        function navigateChange(delta) {
+            const newIdx = state.selectedChangeIndex + delta;
+            if (newIdx >= 0 && newIdx < state.filteredChanges.length) {
+                selectChange(newIdx);
+                const item = document.querySelector(`.file-tree-item[data-idx="${newIdx}"]`);
+                if (item) item.scrollIntoView({ block: 'nearest' });
+            }
+        }
+
         function selectFile(idx) {
             state.selectedFileIndex = idx;
             // 更新高亮
@@ -661,6 +911,10 @@
         }
 
         function navigateFile(delta) {
+            if (state.currentView === 'request_changes') {
+                navigateChange(delta);
+                return;
+            }
             const newIdx = state.selectedFileIndex + delta;
             if (newIdx >= 0 && newIdx < state.filteredFiles.length) {
                 selectFile(newIdx);
@@ -672,6 +926,7 @@
 
         function showSelectFileHint() {
             document.getElementById('selectFileHint').style.display = 'flex';
+            document.getElementById('selectFileHint').querySelector('p').textContent = '从左侧文件列表中选择一个文件查看对比详情';
             document.getElementById('diffFileHeader').style.display = 'none';
             document.getElementById('diffColumnHeaders').style.display = 'none';
             document.getElementById('diffTableWrapper').style.display = 'none';
@@ -925,7 +1180,10 @@
 
         // 键盘快捷键
         document.addEventListener('keydown', (e) => {
-            if (state.filteredFiles.length === 0) return;
+            const hasItems = state.currentView === 'comparison' 
+                ? state.filteredFiles.length > 0 
+                : state.filteredChanges.length > 0;
+            if (!hasItems) return;
             if (e.key === 'ArrowDown' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); navigateFile(1); }
             if (e.key === 'ArrowUp' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); navigateFile(-1); }
         });

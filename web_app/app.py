@@ -262,12 +262,17 @@ def checkout_git_version(repo_path: str, commit_hash: str) -> bool:
         return False
 
 
-def restore_snapshot(date: str, user_id: str, request_id: str) -> Optional[Dict]:
-    """还原指定的快照"""
+def restore_snapshot(date: str, user_id: str, request_id: str) -> Tuple[Optional[Dict], List[Dict]]:
+    """
+    还原指定的快照，并返回变更序列
+    
+    Returns:
+        Tuple[Optional[Dict], List[Dict]]: (还原后的仓库, 变更序列)
+    """
     try:
         reposhot = load_reposhot(CONFIG['reposhot_base'], date, user_id, request_id)
         if not reposhot or not reposhot.get('repo_infos'):
-            return None
+            return None, []
         
         diffs = load_changes(CONFIG['changes_base'], date, user_id, request_id)
         if diffs:
@@ -275,10 +280,34 @@ def restore_snapshot(date: str, user_id: str, request_id: str) -> Optional[Dict]
         else:
             restored = reposhot
         
-        return restored
+        return restored, diffs
     except Exception as e:
         print(f"Error restoring snapshot: {e}")
-        return None
+        return None, []
+
+
+def extract_request_changes(diffs: List[Dict]) -> List[Dict]:
+    """
+    从变更序列中提取文件级的变更摘要，用于前端展示
+    
+    Args:
+        diffs: load_changes 返回的变更序列
+        
+    Returns:
+        List[Dict]: 文件变更列表，每项包含 file_path, op_type, diff, timestamp
+    """
+    file_changes = []
+    for diff_item in diffs:
+        timestamp = diff_item.get('timestamp', 0)
+        results = diff_item.get('results', [])
+        for result in results:
+            file_changes.append({
+                'file_path': result.get('file_path', ''),
+                'op_type': result.get('op_type', 'unknown'),
+                'diff': result.get('diff', ''),
+                'timestamp': timestamp,
+            })
+    return file_changes
 
 
 def compare_versions(restored_repo: Dict, actual_repo_path: str) -> Dict:
@@ -444,14 +473,18 @@ def query_versions():
     # 4. 还原快照
     restore_error = None
     restored_repo = None
+    request_changes = []
     try:
-        restored_repo = restore_snapshot(
+        restored_repo, diffs = restore_snapshot(
             nearest_snapshot['date'],
             user_id,
             nearest_snapshot['request_id']
         )
         if not restored_repo:
             restore_error = f"restore_snapshot returned None for date={nearest_snapshot['date']}, request_id={nearest_snapshot['request_id']}"
+        else:
+            # 提取该 request 的文件变更摘要
+            request_changes = extract_request_changes(diffs)
     except Exception as e:
         restore_error = f"restore_snapshot exception: {str(e)}"
         print(f"Error in restore_snapshot: {e}", flush=True)
@@ -474,7 +507,8 @@ def query_versions():
             'file_count': len(restored_repo.get('repo_infos', {})) if restored_repo else 0
         },
         'commit_version': nearest_commit,
-        'repo_path': actual_repo_path
+        'repo_path': actual_repo_path,
+        'request_changes': request_changes,  # 该 request 的文件变更详情
     }
     
     # 5. 如果快照还原成功，直接与本地仓库 EchoCraft_aacedar 对比
@@ -512,7 +546,7 @@ def compare_detailed():
         }), 400
     
     # 1. 还原快照
-    restored_repo = restore_snapshot(snapshot_date, user_id, request_id)
+    restored_repo, _ = restore_snapshot(snapshot_date, user_id, request_id)
     if not restored_repo:
         return jsonify({
             'success': False,
@@ -557,7 +591,7 @@ def get_file_content():
         }), 400
     
     # 还原快照
-    restored_repo = restore_snapshot(snapshot_date, user_id, request_id)
+    restored_repo, _ = restore_snapshot(snapshot_date, user_id, request_id)
     restored_content = ''
     if restored_repo:
         restored_infos = restored_repo.get('repo_infos', {})
