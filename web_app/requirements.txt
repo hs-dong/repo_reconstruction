@@ -1,0 +1,15 @@
+# Repo Reconstruction Evaluation V2 - Dependencies
+
+# Web framework
+flask>=2.3.0
+flask-cors>=4.0.0
+
+# HTTP client (for API calls)
+requests>=2.28.0
+
+# Data processing
+tqdm>=4.65.0
+
+# Optional: for advanced features
+# gunicorn>=21.0.0  # Production WSGI server
+# redis>=4.5.0      # Caching

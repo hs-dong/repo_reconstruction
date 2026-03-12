@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Repo Reconstruction Evaluation - V2</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --border-color: #30363d;
+            --text-primary: #f0f6fc;
+            --text-secondary: #8b949e;
+            --accent-blue: #58a6ff;
+            --accent-green: #3fb950;
+            --accent-red: #f85149;
+            --accent-yellow: #d29922;
+            --accent-purple: #a371f7;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* ===== 导航栏 ===== */
+        .navbar {
+            background: var(--bg-secondary) !important;
+            border-bottom: 1px solid var(--border-color);
+            padding: 0.75rem 1.5rem;
+            flex-shrink: 0;
+        }
+        .navbar-brand {
+            font-weight: 600; font-size: 1.1rem; color: var(--text-primary) !important;
+            display: flex; align-items: center; gap: 0.5rem;
+        }
+        .navbar-brand i { color: var(--accent-blue); }
+
+        /* ===== 主容器三栏布局 ===== */
+        .main-container { display: flex; flex: 1; overflow: hidden; }
+
+        /* ===== 左侧边栏 - 查询表单 ===== */
+        .sidebar-left {
+            width: 300px; background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            padding: 1rem; flex-shrink: 0; overflow-y: auto;
+        }
+        .section-title {
+            font-size: 0.8rem; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 0.5px; color: var(--text-secondary);
+            margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.4rem;
+        }
+        .form-label { color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.3rem; }
+        .form-control, .form-select {
+            background: var(--bg-primary); border: 1px solid var(--border-color);
+            color: var(--text-primary); padding: 0.5rem 0.75rem;
+            border-radius: 6px; font-size: 0.85rem;
+        }
+        .form-control:focus, .form-select:focus {
+            background: var(--bg-primary); border-color: var(--accent-blue);
+            color: var(--text-primary); box-shadow: 0 0 0 2px rgba(88,166,255,0.15);
+        }
+        .form-control::placeholder { color: var(--text-secondary); }
+        .btn-primary {
+            background: var(--accent-blue); border: none; padding: 0.6rem 1rem;
+            font-weight: 500; border-radius: 6px; font-size: 0.85rem; width: 100%;
+        }
+        .btn-primary:hover { background: #79b8ff; }
+        .btn-primary:disabled { background: var(--bg-tertiary); cursor: not-allowed; }
+
+        .user-list { max-height: 200px; overflow-y: auto; }
+        .user-item {
+            display: flex; align-items: center; padding: 0.5rem;
+            border-radius: 6px; cursor: pointer; transition: background 0.2s; margin-bottom: 0.3rem;
+        }
+        .user-item:hover, .user-item.active { background: var(--bg-tertiary); }
+        .user-avatar {
+            width: 32px; height: 32px; border-radius: 50%; background: var(--accent-blue);
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 600; margin-right: 0.5rem; flex-shrink: 0; font-size: 0.8rem;
+        }
+        .user-info { flex: 1; min-width: 0; }
+        .user-name { font-weight: 500; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .user-meta { font-size: 0.75rem; color: var(--text-secondary); }
+
+        /* ===== 中间 - 文件目录树 ===== */
+        .sidebar-files {
+            width: 280px; background: var(--bg-primary);
+            border-right: 1px solid var(--border-color);
+            flex-shrink: 0; display: flex; flex-direction: column; overflow: hidden;
+        }
+        .files-header {
+            padding: 0.75rem 1rem; border-bottom: 1px solid var(--border-color);
+            background: var(--bg-secondary); flex-shrink: 0;
+        }
+        .files-header-title {
+            font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);
+            text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;
+        }
+        .files-toolbar {
+            display: flex; gap: 4px; flex-wrap: wrap;
+        }
+        .files-toolbar button {
+            background: var(--bg-tertiary); color: var(--text-secondary);
+            border: 1px solid var(--border-color); padding: 2px 8px;
+            border-radius: 4px; cursor: pointer; font-size: 0.7rem; transition: all 0.15s;
+        }
+        .files-toolbar button:hover { background: var(--border-color); color: var(--text-primary); }
+        .files-toolbar button.active { background: var(--accent-blue); border-color: var(--accent-blue); color: #fff; }
+        .files-search {
+            margin-top: 0.4rem;
+        }
+        .files-search input {
+            width: 100%; background: var(--bg-primary); border: 1px solid var(--border-color);
+            color: var(--text-primary); padding: 4px 8px; border-radius: 4px; font-size: 0.75rem;
+        }
+        .files-search input::placeholder { color: #484f58; }
+
+        .file-tree {
+            flex: 1; overflow-y: auto; padding: 4px 0;
+        }
+        .file-tree-item {
+            padding: 5px 12px; font-size: 0.78rem; cursor: pointer;
+            display: flex; align-items: center; gap: 6px;
+            border-left: 3px solid transparent; transition: all 0.1s;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .file-tree-item:hover { background: var(--bg-secondary); }
+        .file-tree-item.active { background: var(--bg-tertiary); border-left-color: var(--accent-blue); }
+        .file-tree-item .status-icon { flex-shrink: 0; font-size: 0.7rem; width: 14px; text-align: center; }
+        .file-tree-item .file-name { overflow: hidden; text-overflow: ellipsis; }
+        .file-tree-item .sim-badge {
+            margin-left: auto; flex-shrink: 0; font-size: 0.65rem;
+            padding: 1px 5px; border-radius: 3px; font-weight: 500;
+        }
+        .status-identical .status-icon { color: var(--accent-green); }
+        .status-different .status-icon { color: var(--accent-yellow); }
+        .status-missing .status-icon { color: var(--accent-red); }
+        .status-only-actual .status-icon { color: var(--accent-blue); }
+
+        /* ===== 统计栏 ===== */
+        .stats-bar {
+            background: var(--bg-secondary); border-bottom: 1px solid var(--border-color);
+            padding: 8px 16px; display: flex; gap: 16px; flex-wrap: wrap;
+            align-items: center; flex-shrink: 0; font-size: 0.8rem;
+        }
+        .stat-chip {
+            display: flex; align-items: center; gap: 5px;
+        }
+        .stat-dot { width: 8px; height: 8px; border-radius: 50%; }
+        .stat-dot.identical { background: var(--accent-green); }
+        .stat-dot.different { background: var(--accent-yellow); }
+        .stat-dot.missing { background: var(--accent-red); }
+        .stat-dot.only-actual { background: var(--accent-blue); }
+        .stat-val { font-weight: 600; color: var(--text-primary); }
+
+        /* ===== 右侧 - Diff 展示区 ===== */
+        .content-area {
+            flex: 1; display: flex; flex-direction: column; overflow: hidden;
+        }
+
+        .diff-container { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+
+        /* 版本信息栏 */
+        .version-info-bar {
+            background: var(--bg-secondary); border-bottom: 1px solid var(--border-color);
+            padding: 10px 16px; flex-shrink: 0;
+        }
+        .version-cards { display: flex; gap: 12px; }
+        .version-card {
+            flex: 1; background: var(--bg-primary); border: 1px solid var(--border-color);
+            border-radius: 6px; padding: 10px 14px; font-size: 0.8rem;
+        }
+        .version-card .vc-label {
+            font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 0.5px; margin-bottom: 4px;
+        }
+        .version-card.commit .vc-label { color: var(--accent-purple); }
+        .version-card.require .vc-label { color: var(--accent-green); }
+        .version-card .vc-detail { color: var(--text-secondary); font-size: 0.75rem; }
+        .version-card .vc-detail strong { color: var(--text-primary); }
+
+        /* 文件 diff 头部 */
+        .diff-file-header {
+            background: var(--bg-secondary); border-bottom: 1px solid var(--border-color);
+            padding: 8px 16px; display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+        }
+        .diff-file-path {
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 0.85rem; color: var(--accent-blue); flex: 1;
+        }
+        .diff-file-badge {
+            font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; font-weight: 600;
+        }
+        .diff-file-badge.identical { background: #238636; color: #fff; }
+        .diff-file-badge.different { background: #9e6a03; color: #fff; }
+        .diff-file-badge.missing { background: #da3633; color: #fff; }
+
+        /* 列标题 */
+        .diff-column-headers {
+            display: flex; background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-color); flex-shrink: 0;
+        }
+        .diff-col-label {
+            flex: 1; padding: 5px 16px; text-align: center;
+            font-size: 0.75rem; font-weight: 600; color: var(--text-secondary);
+        }
+        .diff-col-label:first-child { border-right: 1px solid var(--border-color); }
+
+        /* diff 表格 */
+        .diff-table-wrapper { flex: 1; overflow: auto; }
+        .diff-table {
+            width: 100%; border-collapse: collapse;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 0.78rem; line-height: 20px; table-layout: fixed;
+        }
+        .diff-table td { vertical-align: top; }
+        .diff-table .line-num {
+            width: 45px; min-width: 45px; max-width: 45px;
+            text-align: right; padding: 0 6px; color: #484f58;
+            background: var(--bg-primary); border-right: 1px solid #21262d;
+            user-select: none; font-size: 0.7rem;
+        }
+        .diff-table .line-content {
+            padding: 0 10px; white-space: pre-wrap; word-break: break-all;
+            width: calc(50% - 45px);
+        }
+        .line-equal { background: var(--bg-primary); }
+        .line-modified { background: rgba(210,153,34,0.15); }
+        .line-removed { background: rgba(248,81,73,0.15); }
+        .line-added { background: rgba(63,185,80,0.15); }
+        .line-empty { background: var(--bg-secondary); }
+        .char-removed { background: rgba(248,81,73,0.4); border-radius: 2px; padding: 0 1px; }
+        .char-added { background: rgba(63,185,80,0.4); border-radius: 2px; padding: 0 1px; }
+        .diff-table tr:hover .line-equal { background: var(--bg-secondary); }
+
+        /* 空状态和 identical 提示 */
+        .diff-placeholder {
+            flex: 1; display: flex; align-items: center; justify-content: center;
+            color: var(--text-secondary); font-size: 0.9rem; text-align: center; padding: 2rem;
+        }
+        .diff-placeholder i { font-size: 2.5rem; opacity: 0.4; display: block; margin-bottom: 0.5rem; }
+        .identical-notice {
+            padding: 40px; text-align: center; color: var(--accent-green); font-size: 0.9rem;
+        }
+
+        /* ===== Loading ===== */
+        .loading-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7); display: flex; align-items: center;
+            justify-content: center; z-index: 9999; opacity: 0;
+            pointer-events: none; transition: opacity 0.3s;
+        }
+        .loading-overlay.active { opacity: 1; pointer-events: auto; }
+        .spinner {
+            width: 40px; height: 40px; border: 3px solid var(--border-color);
+            border-top-color: var(--accent-blue); border-radius: 50%;
+            animation: spin 0.8s linear infinite; margin: 0 auto 0.75rem;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ===== Alert ===== */
+        .alert-custom {
+            background: var(--bg-tertiary); border: 1px solid var(--border-color);
+            border-radius: 8px; padding: 0.75rem 1rem; color: var(--text-primary); margin-bottom: 0.5rem;
+        }
+        .alert-custom.success { border-left: 4px solid var(--accent-green); }
+        .alert-custom.error { border-left: 4px solid var(--accent-red); }
+        .alert-custom.info { border-left: 4px solid var(--accent-blue); }
+
+        /* 滚动条 */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-primary); }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #484f58; }
+
+        /* 按钮通用 */
+        .btn-outline {
+            background: transparent; border: 1px solid var(--border-color);
+            color: var(--text-primary); padding: 0.4rem 0.8rem; border-radius: 6px;
+            cursor: pointer; font-size: 0.8rem; transition: all 0.2s;
+        }
+        .btn-outline:hover { background: var(--bg-tertiary); border-color: var(--accent-blue); color: var(--text-primary); }
+
+        /* 导航按钮 */
+        .nav-buttons {
+            display: flex; gap: 6px; align-items: center;
+        }
+        .nav-btn {
+            background: var(--bg-tertiary); border: 1px solid var(--border-color);
+            color: var(--text-secondary); padding: 4px 10px; border-radius: 4px;
+            cursor: pointer; font-size: 0.75rem; transition: all 0.15s;
+        }
+        .nav-btn:hover { background: var(--border-color); color: var(--text-primary); }
+        .nav-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        @media (max-width: 1200px) {
+            .sidebar-left { width: 260px; }
+            .sidebar-files { width: 240px; }
+        }
+        @media (max-width: 900px) {
+            .sidebar-files { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar">
+        <a class="navbar-brand" href="#">
+            <i class="bi bi-git"></i> Repo Reconstruction Evaluation V2
+        </a>
+        <div>
+            <button class="btn-outline" onclick="refreshData()">
+                <i class="bi bi-arrow-clockwise"></i> 刷新
+            </button>
+        </div>
+    </nav>
+
+    <!-- 主容器 -->
+    <div class="main-container">
+        <!-- 左侧栏 - 查询表单 -->
+        <div class="sidebar-left">
+            <div class="section-title"><i class="bi bi-search"></i> 查询参数</div>
+            <form id="queryForm">
+                <div class="mb-2">
+                    <label class="form-label">User ID</label>
+                    <select class="form-select" id="userSelect" required>
+                        <option value="">选择用户...</option>
+                    </select>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label">GitHub 用户名</label>
+                    <input type="text" class="form-control" id="githubUsername" placeholder="例如: xwellxia" required>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label">查询时间点</label>
+                    <input type="datetime-local" class="form-control" id="targetTime" required>
+                </div>
+                <button type="submit" class="btn btn-primary" id="queryBtn">
+                    <i class="bi bi-search"></i> 执行查询
+                </button>
+            </form>
+
+            <hr style="border-color: var(--border-color); margin: 1rem 0;">
+
+            <div class="section-title"><i class="bi bi-people"></i> 已知用户</div>
+            <div class="user-list" id="userList"></div>
+        </div>
+
+        <!-- 中间栏 - 文件目录树 -->
+        <div class="sidebar-files" id="sidebarFiles" style="display: none;">
+            <div class="files-header">
+                <div class="files-header-title" id="filesHeaderTitle">FILES (0)</div>
+                <div class="files-toolbar">
+                    <button class="active" data-filter="all" onclick="filterTreeFiles('all', this)">All</button>
+                    <button data-filter="different" onclick="filterTreeFiles('different', this)">Different</button>
+                    <button data-filter="missing_in_actual" onclick="filterTreeFiles('missing_in_actual', this)">Missing</button>
+                    <button data-filter="identical" onclick="filterTreeFiles('identical', this)">Identical</button>
+                </div>
+                <div class="files-search">
+                    <input type="text" placeholder="搜索文件名..." oninput="searchTreeFiles(this.value)">
+                </div>
+            </div>
+            <div class="file-tree" id="fileTree"></div>
+        </div>
+
+        <!-- 右侧 - Diff 展示区 -->
+        <div class="content-area">
+            <!-- 统计栏（查询后显示） -->
+            <div class="stats-bar" id="statsBar" style="display: none;">
+                <div class="stat-chip"><div class="stat-dot identical"></div><span>Identical: <span class="stat-val" id="statIdentical">0</span></span></div>
+                <div class="stat-chip"><div class="stat-dot different"></div><span>Different: <span class="stat-val" id="statDifferent">0</span></span></div>
+                <div class="stat-chip"><div class="stat-dot missing"></div><span>Missing: <span class="stat-val" id="statMissing">0</span></span></div>
+                <div class="stat-chip"><span>Avg Sim: <span class="stat-val" id="statSimilarity">-</span></span></div>
+                <div class="stat-chip"><span>Total: <span class="stat-val" id="statTotal">0</span></span></div>
+            </div>
+
+            <!-- 版本信息 -->
+            <div class="version-info-bar" id="versionInfoBar" style="display: none;">
+                <div class="version-cards">
+                    <div class="version-card commit">
+                        <div class="vc-label"><i class="bi bi-git"></i> Commit 版本</div>
+                        <div class="vc-detail">
+                            <strong id="commitHash">-</strong> · <span id="commitTime">-</span> · <span id="commitAuthor">-</span>
+                        </div>
+                        <div class="vc-detail" style="margin-top:2px;"><span id="commitMessage">-</span></div>
+                    </div>
+                    <div class="version-card require">
+                        <div class="vc-label"><i class="bi bi-archive"></i> Require 版本 (快照)</div>
+                        <div class="vc-detail">
+                            <strong id="snapshotDate">-</strong> · 请求ID: <span id="requestId" style="font-family:monospace;">-</span>
+                        </div>
+                        <div class="vc-detail" style="margin-top:2px;">
+                            文件数: <strong id="fileCount">-</strong> · 还原: <span id="restoreStatus">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Diff 展示区 -->
+            <div class="diff-container" id="diffContainer">
+                <!-- 初始空状态 -->
+                <div class="diff-placeholder" id="emptyState">
+                    <div>
+                        <i class="bi bi-layers"></i>
+                        <h5>开始查询</h5>
+                        <p>在左侧输入查询参数，点击"执行查询"按钮开始版本对比</p>
+                    </div>
+                </div>
+
+                <!-- 文件 diff 头部（选中文件后显示） -->
+                <div class="diff-file-header" id="diffFileHeader" style="display: none;">
+                    <span class="diff-file-path" id="diffFilePath">-</span>
+                    <span class="diff-file-badge" id="diffFileBadge">-</span>
+                    <div class="nav-buttons">
+                        <button class="nav-btn" onclick="navigateFile(-1)" title="上一个文件"><i class="bi bi-chevron-up"></i></button>
+                        <span style="font-size:0.7rem; color:var(--text-secondary);" id="fileNavIndex">-</span>
+                        <button class="nav-btn" onclick="navigateFile(1)" title="下一个文件"><i class="bi bi-chevron-down"></i></button>
+                    </div>
+                </div>
+
+                <!-- 列标题 -->
+                <div class="diff-column-headers" id="diffColumnHeaders" style="display: none;">
+                    <div class="diff-col-label"><i class="bi bi-archive"></i> 还原版本 (Restored)</div>
+                    <div class="diff-col-label"><i class="bi bi-folder2-open"></i> 真实仓库 (Actual)</div>
+                </div>
+
+                <!-- diff 表格内容 -->
+                <div class="diff-table-wrapper" id="diffTableWrapper" style="display: none;">
+                    <table class="diff-table" id="diffTable"><tbody id="diffTableBody"></tbody></table>
+                </div>
+
+                <!-- 提示文本（选择文件后才显示 diff） -->
+                <div class="diff-placeholder" id="selectFileHint" style="display: none;">
+                    <div>
+                        <i class="bi bi-file-earmark-diff"></i>
+                        <p>从左侧文件列表中选择一个文件查看对比详情</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div style="text-align:center; color:var(--text-primary);">
+            <div class="spinner"></div>
+            <p id="loadingText">正在加载...</p>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // ==================== 全局状态 ====================
+        const state = {
+            users: [],
+            currentResult: null,
+            fileDetails: [],       // 所有文件详情（含内容）
+            filteredFiles: [],     // 过滤后的文件列表
+            selectedFileIndex: -1, // 当前选中的文件在 filteredFiles 中的索引
+            currentFilter: 'all',
+        };
+
+        const API_BASE = '';
+
+        // ==================== 工具函数 ====================
+        function showLoading(text = '正在加载...') {
+            document.getElementById('loadingText').textContent = text;
+            document.getElementById('loadingOverlay').classList.add('active');
+        }
+        function hideLoading() {
+            document.getElementById('loadingOverlay').classList.remove('active');
+        }
+        function showAlert(message, type = 'info') {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert-custom ${type}`;
+            alertDiv.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:10000;min-width:400px;max-width:600px;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+            alertDiv.innerHTML = `<i class="bi bi-${type === 'error' ? 'exclamation-circle' : type === 'success' ? 'check-circle' : 'info-circle'}"></i> ${message}
+                <span style="float:right;cursor:pointer;margin-left:1rem;" onclick="this.parentElement.remove()">&times;</span>`;
+            document.body.appendChild(alertDiv);
+            setTimeout(() => { if (alertDiv.parentElement) { alertDiv.style.transition='opacity 0.3s'; alertDiv.style.opacity='0'; setTimeout(()=>alertDiv.remove(),300); } }, 5000);
+        }
+        function escapeHtml(text) {
+            const d = document.createElement('div');
+            d.textContent = text;
+            return d.innerHTML;
+        }
+
+        // ==================== API ====================
+        async function fetchUsers() {
+            try {
+                const resp = await fetch(`${API_BASE}/api/users`);
+                const data = await resp.json();
+                if (data.success) { state.users = data.users; renderUserList(); populateUserSelect(); }
+            } catch (e) { console.error('获取用户列表失败:', e); }
+        }
+
+        async function executeQuery(userId, githubUsername, targetTime) {
+            showLoading('正在查询版本信息...');
+            try {
+                const resp = await fetch(`${API_BASE}/api/query`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: userId, github_username: githubUsername, target_time: targetTime })
+                });
+                const data = await resp.json();
+                hideLoading();
+                if (data.success) {
+                    state.currentResult = data;
+                    renderResult(data);
+                } else {
+                    showAlert(data.error || '查询失败', 'error');
+                }
+            } catch (e) {
+                hideLoading();
+                showAlert('查询请求失败: ' + e.message, 'error');
+            }
+        }
+
+        // ==================== 渲染函数 ====================
+        function renderUserList() {
+            const c = document.getElementById('userList');
+            if (!state.users.length) { c.innerHTML = '<p style="color:var(--text-secondary);font-size:0.8rem;">暂无用户数据</p>'; return; }
+            c.innerHTML = state.users.map(u => `
+                <div class="user-item" onclick="selectUser('${u.user_id}','${u.github_username}')">
+                    <div class="user-avatar">${u.name.charAt(0)}</div>
+                    <div class="user-info">
+                        <div class="user-name">${u.name}</div>
+                        <div class="user-meta"><i class="bi bi-github"></i> ${u.github_username||'N/A'} · ${u.snapshot_count} 快照</div>
+                    </div>
+                </div>`).join('');
+        }
+        function populateUserSelect() {
+            const s = document.getElementById('userSelect');
+            s.innerHTML = '<option value="">选择用户...</option>' +
+                state.users.map(u => `<option value="${u.user_id}" data-github="${u.github_username}">${u.name} (${u.user_id.substring(0,8)}...)</option>`).join('');
+        }
+        function selectUser(userId, githubUsername) {
+            document.getElementById('userSelect').value = userId;
+            document.getElementById('githubUsername').value = githubUsername || '';
+            document.querySelectorAll('.user-item').forEach(i => i.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+        }
+
+        function renderResult(data) {
+            // 隐藏空状态
+            document.getElementById('emptyState').style.display = 'none';
+            document.getElementById('selectFileHint').style.display = 'flex';
+
+            // 显示版本信息
+            document.getElementById('versionInfoBar').style.display = '';
+            if (data.commit_version) {
+                document.getElementById('commitHash').textContent = data.commit_version.short_hash || '-';
+                document.getElementById('commitTime').textContent = data.commit_version.fixed_time || data.commit_version.date || '-';
+                document.getElementById('commitAuthor').textContent = data.commit_version.author_name || '-';
+                document.getElementById('commitMessage').textContent = data.commit_version.message || '-';
+            }
+            if (data.require_version) {
+                const s = data.require_version.snapshot;
+                document.getElementById('snapshotDate').textContent = s?.date || '-';
+                document.getElementById('requestId').textContent = s?.request_id || '-';
+                document.getElementById('fileCount').textContent = data.require_version.file_count || 0;
+                document.getElementById('restoreStatus').textContent = data.require_version.restored ? '✓ 成功' : '✗ 失败';
+            }
+
+            // 统计栏
+            if (data.comparison) {
+                const c = data.comparison;
+                document.getElementById('statsBar').style.display = '';
+                document.getElementById('statIdentical').textContent = c.identical_files || 0;
+                document.getElementById('statDifferent').textContent = c.different_files || 0;
+                document.getElementById('statMissing').textContent = c.missing_in_actual || 0;
+                document.getElementById('statTotal').textContent = c.total_restored_files || 0;
+                const sim = c.avg_similarity || 0;
+                document.getElementById('statSimilarity').textContent = (sim * 100).toFixed(1) + '%';
+
+                // 文件列表
+                state.fileDetails = c.file_details || [];
+                // 排序：different > missing > identical
+                const order = { 'different': 0, 'missing_in_actual': 1, 'identical': 2 };
+                state.fileDetails.sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9) || a.rel_path.localeCompare(b.rel_path));
+
+                state.currentFilter = 'all';
+                state.filteredFiles = [...state.fileDetails];
+                state.selectedFileIndex = -1;
+
+                document.getElementById('sidebarFiles').style.display = '';
+                document.getElementById('filesHeaderTitle').textContent = `FILES (${state.fileDetails.length})`;
+                renderFileTree();
+            } else {
+                const reason = data.compare_error || '对比过程出错';
+                showAlert(reason, 'error');
+            }
+        }
+
+        function renderFileTree() {
+            const c = document.getElementById('fileTree');
+            c.innerHTML = state.filteredFiles.map((f, idx) => {
+                const statusMap = { 'identical': 'identical', 'different': 'different', 'missing_in_actual': 'missing' };
+                const iconMap = { 'identical': '✓', 'different': '≠', 'missing_in_actual': '✗' };
+                const sc = statusMap[f.status] || '';
+                const icon = iconMap[f.status] || '?';
+                let simBadge = '';
+                if (f.status === 'different') {
+                    const simPct = ((f.similarity || 0) * 100).toFixed(0);
+                    simBadge = `<span class="sim-badge" style="background:rgba(210,153,34,0.2);color:var(--accent-yellow);">${simPct}%</span>`;
+                }
+                const activeClass = idx === state.selectedFileIndex ? ' active' : '';
+                return `<div class="file-tree-item status-${sc}${activeClass}" data-idx="${idx}" data-status="${f.status}" onclick="selectFile(${idx})">
+                    <span class="status-icon">${icon}</span>
+                    <span class="file-name" title="${escapeHtml(f.rel_path)}">${escapeHtml(f.rel_path)}</span>
+                    ${simBadge}
+                </div>`;
+            }).join('');
+        }
+
+        function filterTreeFiles(status, btn) {
+            document.querySelectorAll('.files-toolbar button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            state.currentFilter = status;
+            if (status === 'all') {
+                state.filteredFiles = [...state.fileDetails];
+            } else {
+                state.filteredFiles = state.fileDetails.filter(f => f.status === status);
+            }
+            state.selectedFileIndex = -1;
+            renderFileTree();
+            // 隐藏 diff，显示提示
+            showSelectFileHint();
+        }
+
+        function searchTreeFiles(query) {
+            query = query.toLowerCase();
+            document.querySelectorAll('.file-tree-item').forEach(item => {
+                const name = item.querySelector('.file-name').textContent.toLowerCase();
+                item.style.display = name.includes(query) ? '' : 'none';
+            });
+        }
+
+        function selectFile(idx) {
+            state.selectedFileIndex = idx;
+            // 更新高亮
+            document.querySelectorAll('.file-tree-item').forEach(i => i.classList.remove('active'));
+            const item = document.querySelector(`.file-tree-item[data-idx="${idx}"]`);
+            if (item) item.classList.add('active');
+
+            const file = state.filteredFiles[idx];
+            if (!file) return;
+
+            renderFileDiff(file, idx);
+        }
+
+        function navigateFile(delta) {
+            const newIdx = state.selectedFileIndex + delta;
+            if (newIdx >= 0 && newIdx < state.filteredFiles.length) {
+                selectFile(newIdx);
+                // 滚动文件树使其可见
+                const item = document.querySelector(`.file-tree-item[data-idx="${newIdx}"]`);
+                if (item) item.scrollIntoView({ block: 'nearest' });
+            }
+        }
+
+        function showSelectFileHint() {
+            document.getElementById('selectFileHint').style.display = 'flex';
+            document.getElementById('diffFileHeader').style.display = 'none';
+            document.getElementById('diffColumnHeaders').style.display = 'none';
+            document.getElementById('diffTableWrapper').style.display = 'none';
+        }
+
+        // ==================== Diff 渲染 ====================
+        function renderFileDiff(file, idx) {
+            // 隐藏提示
+            document.getElementById('emptyState').style.display = 'none';
+            document.getElementById('selectFileHint').style.display = 'none';
+
+            // 文件头
+            document.getElementById('diffFileHeader').style.display = '';
+            document.getElementById('diffFilePath').textContent = file.rel_path;
+            const badge = document.getElementById('diffFileBadge');
+            const badgeMap = {
+                'identical': ['IDENTICAL', 'identical'],
+                'different': [`DIFFERENT (sim: ${((file.similarity||0)*100).toFixed(1)}%)`, 'different'],
+                'missing_in_actual': ['MISSING IN ACTUAL', 'missing'],
+            };
+            const [badgeText, badgeClass] = badgeMap[file.status] || [file.status, ''];
+            badge.textContent = badgeText;
+            badge.className = 'diff-file-badge ' + badgeClass;
+
+            // 导航索引
+            document.getElementById('fileNavIndex').textContent = `${idx + 1}/${state.filteredFiles.length}`;
+
+            // 列标题
+            document.getElementById('diffColumnHeaders').style.display = '';
+            document.getElementById('diffTableWrapper').style.display = '';
+
+            const tbody = document.getElementById('diffTableBody');
+
+            const restoredContent = file.restored_content || '';
+            const actualContent = file.actual_content || '';
+
+            if (file.status === 'identical') {
+                const lineCount = restoredContent ? restoredContent.split('\n').length : 0;
+                tbody.innerHTML = '';
+                document.getElementById('diffTableWrapper').innerHTML = `<div class="identical-notice"><i class="bi bi-check-circle"></i> 文件内容完全一致（${lineCount} 行）</div>`;
+                return;
+            }
+
+            // 恢复 table
+            document.getElementById('diffTableWrapper').innerHTML = '<table class="diff-table"><tbody id="diffTableBody"></tbody></table>';
+            const newTbody = document.getElementById('diffTableBody');
+
+            const linesA = restoredContent ? restoredContent.split('\n') : [];
+            const linesB = actualContent ? actualContent.split('\n') : [];
+
+            if (file.status === 'missing_in_actual') {
+                // 只有左边
+                newTbody.innerHTML = linesA.map((line, i) =>
+                    `<tr><td class="line-num">${i+1}</td><td class="line-content line-removed">${escapeHtml(line)}</td>` +
+                    `<td class="line-num"></td><td class="line-content line-empty"></td></tr>`
+                ).join('');
+                return;
+            }
+
+            // different: 逐行对比
+            const aligned = computeLineDiffs(linesA, linesB);
+            let leftNum = 0, rightNum = 0;
+            const rows = [];
+            for (const [leftLine, rightLine, leftType, rightType] of aligned) {
+                if (leftType !== 'empty') leftNum++;
+                if (rightType !== 'empty') rightNum++;
+                const lNumStr = leftType !== 'empty' ? leftNum : '';
+                const rNumStr = rightType !== 'empty' ? rightNum : '';
+
+                let lHtml, rHtml, lClass, rClass;
+                if (leftType === 'modified' && rightType === 'modified') {
+                    [lHtml, rHtml] = renderInlineDiff(leftLine, rightLine);
+                    lClass = 'line-modified';
+                    rClass = 'line-modified';
+                } else {
+                    lHtml = escapeHtml(leftLine);
+                    rHtml = escapeHtml(rightLine);
+                    const classMap = { 'equal': 'line-equal', 'removed': 'line-removed', 'modified': 'line-modified', 'empty': 'line-empty', 'added': 'line-added' };
+                    lClass = classMap[leftType] || '';
+                    rClass = classMap[rightType] || '';
+                }
+
+                rows.push(`<tr><td class="line-num">${lNumStr}</td><td class="line-content ${lClass}">${lHtml}</td>` +
+                           `<td class="line-num">${rNumStr}</td><td class="line-content ${rClass}">${rHtml}</td></tr>`);
+            }
+            newTbody.innerHTML = rows.join('');
+        }
+
+        // ==================== Diff 算法 (JS 实现) ====================
+        /**
+         * 简单 LCS-based diff: 使用 SequenceMatcher 思路
+         * 返回 aligned 行列表: [leftLine, rightLine, leftType, rightType]
+         */
+        function computeLineDiffs(linesA, linesB) {
+            const result = [];
+            const opcodes = getOpcodes(linesA, linesB);
+            for (const [tag, i1, i2, j1, j2] of opcodes) {
+                if (tag === 'equal') {
+                    for (let k = 0; k < i2 - i1; k++) {
+                        result.push([linesA[i1 + k], linesB[j1 + k], 'equal', 'equal']);
+                    }
+                } else if (tag === 'replace') {
+                    const leftLines = linesA.slice(i1, i2);
+                    const rightLines = linesB.slice(j1, j2);
+                    const maxLen = Math.max(leftLines.length, rightLines.length);
+                    for (let k = 0; k < maxLen; k++) {
+                        const l = k < leftLines.length ? leftLines[k] : '';
+                        const r = k < rightLines.length ? rightLines[k] : '';
+                        const lt = k < leftLines.length ? 'modified' : 'empty';
+                        const rt = k < rightLines.length ? 'modified' : 'empty';
+                        result.push([l, r, lt, rt]);
+                    }
+                } else if (tag === 'delete') {
+                    for (let i = i1; i < i2; i++) {
+                        result.push([linesA[i], '', 'removed', 'empty']);
+                    }
+                } else if (tag === 'insert') {
+                    for (let j = j1; j < j2; j++) {
+                        result.push(['', linesB[j], 'empty', 'added']);
+                    }
+                }
+            }
+            return result;
+        }
+
+        /**
+         * 简化的 SequenceMatcher opcodes（基于 LCS）
+         */
+        function getOpcodes(a, b) {
+            // 使用 patience diff 简化版：先找 LCS，然后生成 opcodes
+            const lcs = longestCommonSubseq(a, b);
+            const opcodes = [];
+            let ai = 0, bi = 0;
+            for (const [aIdx, bIdx] of lcs) {
+                if (ai < aIdx || bi < bIdx) {
+                    if (ai < aIdx && bi < bIdx) {
+                        opcodes.push(['replace', ai, aIdx, bi, bIdx]);
+                    } else if (ai < aIdx) {
+                        opcodes.push(['delete', ai, aIdx, bi, bi]);
+                    } else {
+                        opcodes.push(['insert', ai, ai, bi, bIdx]);
+                    }
+                }
+                opcodes.push(['equal', aIdx, aIdx + 1, bIdx, bIdx + 1]);
+                ai = aIdx + 1;
+                bi = bIdx + 1;
+            }
+            if (ai < a.length || bi < b.length) {
+                if (ai < a.length && bi < b.length) {
+                    opcodes.push(['replace', ai, a.length, bi, b.length]);
+                } else if (ai < a.length) {
+                    opcodes.push(['delete', ai, a.length, bi, bi]);
+                } else {
+                    opcodes.push(['insert', ai, ai, bi, b.length]);
+                }
+            }
+            return opcodes;
+        }
+
+        /**
+         * LCS 索引对
+         */
+        function longestCommonSubseq(a, b) {
+            const m = a.length, n = b.length;
+            // 优化：对大文件使用 Map 加速
+            if (m === 0 || n === 0) return [];
+
+            // 建立 b 的行到索引列表的映射
+            const bMap = new Map();
+            for (let j = 0; j < n; j++) {
+                if (!bMap.has(b[j])) bMap.set(b[j], []);
+                bMap.get(b[j]).push(j);
+            }
+
+            // Patience sorting / Hunt-Szymanski 风格
+            const tails = []; // tails[k] = 最小的 b-index 使得有长度 k+1 的 LCS 结尾
+            const links = []; // 用于回溯
+
+            for (let i = 0; i < m; i++) {
+                const line = a[i];
+                const positions = bMap.get(line);
+                if (!positions) continue;
+                // 反向遍历位置，做 patience sorting
+                for (let pi = positions.length - 1; pi >= 0; pi--) {
+                    const j = positions[pi];
+                    // 二分查找 tails 中第一个 >= j 的位置
+                    let lo = 0, hi = tails.length;
+                    while (lo < hi) {
+                        const mid = (lo + hi) >> 1;
+                        if (tails[mid] < j) lo = mid + 1;
+                        else hi = mid;
+                    }
+                    tails[lo] = j;
+                    links[lo] = { i, j, prev: lo > 0 ? links[lo - 1] : null };
+                }
+            }
+
+            // 回溯
+            const result = [];
+            let node = links.length > 0 ? links[links.length - 1] : null;
+            while (node) {
+                result.push([node.i, node.j]);
+                node = node.prev;
+            }
+            result.reverse();
+            return result;
+        }
+
+        /**
+         * 字符级 inline diff
+         */
+        function renderInlineDiff(oldLine, newLine) {
+            if (!oldLine && !newLine) return ['', ''];
+            if (!oldLine) return ['', `<span class="char-added">${escapeHtml(newLine)}</span>`];
+            if (!newLine) return [`<span class="char-removed">${escapeHtml(oldLine)}</span>`, ''];
+
+            // 简单字符级 diff: 找公共前缀和后缀
+            const charOpcodes = getOpcodes([...oldLine], [...newLine]);
+            let leftParts = [], rightParts = [];
+            for (const [tag, i1, i2, j1, j2] of charOpcodes) {
+                if (tag === 'equal') {
+                    leftParts.push(escapeHtml(oldLine.slice(i1, i2)));
+                    rightParts.push(escapeHtml(newLine.slice(j1, j2)));
+                } else if (tag === 'replace') {
+                    leftParts.push(`<span class="char-removed">${escapeHtml(oldLine.slice(i1, i2))}</span>`);
+                    rightParts.push(`<span class="char-added">${escapeHtml(newLine.slice(j1, j2))}</span>`);
+                } else if (tag === 'delete') {
+                    leftParts.push(`<span class="char-removed">${escapeHtml(oldLine.slice(i1, i2))}</span>`);
+                } else if (tag === 'insert') {
+                    rightParts.push(`<span class="char-added">${escapeHtml(newLine.slice(j1, j2))}</span>`);
+                }
+            }
+            return [leftParts.join(''), rightParts.join('')];
+        }
+
+        // ==================== 事件处理 ====================
+        document.getElementById('queryForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const userId = document.getElementById('userSelect').value;
+            const githubUsername = document.getElementById('githubUsername').value;
+            const targetTimeInput = document.getElementById('targetTime').value;
+            if (!userId || !githubUsername || !targetTimeInput) { showAlert('请填写所有必填字段', 'error'); return; }
+            const targetTime = targetTimeInput.replace('T', ' ') + ':00';
+            await executeQuery(userId, githubUsername, targetTime);
+        });
+
+        document.getElementById('userSelect').addEventListener('change', (e) => {
+            const github = e.target.selectedOptions[0]?.dataset?.github;
+            if (github) document.getElementById('githubUsername').value = github;
+        });
+
+        // 键盘快捷键
+        document.addEventListener('keydown', (e) => {
+            if (state.filteredFiles.length === 0) return;
+            if (e.key === 'ArrowDown' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); navigateFile(1); }
+            if (e.key === 'ArrowUp' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); navigateFile(-1); }
+        });
+
+        function refreshData() { fetchUsers(); }
+
+        // ==================== 初始化 ====================
+        document.addEventListener('DOMContentLoaded', () => {
+            const now = new Date();
+            const localTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+            document.getElementById('targetTime').value = localTime.toISOString().slice(0, 16);
+            fetchUsers();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,1435 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Repo Reconstruction Evaluation V2 - Standalone</title>
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --bg-hover: #1c2128;
+            --border-color: #30363d;
+            --text-primary: #f0f6fc;
+            --text-secondary: #8b949e;
+            --text-muted: #484f58;
+            --accent-blue: #58a6ff;
+            --accent-green: #3fb950;
+            --accent-red: #f85149;
+            --accent-yellow: #d29922;
+            --accent-purple: #a371f7;
+            --accent-cyan: #39c5cf;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ==================== 导航栏 ==================== */
+        .navbar {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0.875rem 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .navbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-weight: 600;
+            font-size: 1.125rem;
+            color: var(--text-primary);
+            text-decoration: none;
+        }
+
+        .navbar-brand svg {
+            width: 24px;
+            height: 24px;
+            color: var(--accent-blue);
+        }
+
+        .navbar-version {
+            background: var(--bg-tertiary);
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            color: var(--accent-cyan);
+            font-weight: 500;
+        }
+
+        /* ==================== 主布局 ==================== */
+        .main-container {
+            display: grid;
+            grid-template-columns: 340px 1fr;
+            min-height: calc(100vh - 57px);
+        }
+
+        .sidebar {
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            padding: 1.5rem;
+            overflow-y: auto;
+        }
+
+        .content-area {
+            padding: 1.5rem;
+            overflow-y: auto;
+            background: var(--bg-primary);
+        }
+
+        /* ==================== 表单样式 ==================== */
+        .form-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 0.625rem 0.875rem;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.15);
+        }
+
+        .form-control::placeholder {
+            color: var(--text-muted);
+        }
+
+        select.form-control {
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%238b949e' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.75rem center;
+            padding-right: 2.5rem;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.625rem 1.25rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+        }
+
+        .btn-primary {
+            background: var(--accent-blue);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background: #79b8ff;
+        }
+
+        .btn-primary:disabled {
+            background: var(--bg-tertiary);
+            color: var(--text-muted);
+            cursor: not-allowed;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+
+        .btn-outline:hover {
+            background: var(--bg-tertiary);
+            border-color: var(--text-secondary);
+        }
+
+        .btn-block {
+            width: 100%;
+        }
+
+        /* ==================== 用户列表 ==================== */
+        .user-list {
+            max-height: 320px;
+            overflow-y: auto;
+            margin-top: 0.75rem;
+        }
+
+        .user-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.15s;
+            margin-bottom: 0.375rem;
+        }
+
+        .user-item:hover {
+            background: var(--bg-hover);
+        }
+
+        .user-item.active {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--accent-blue);
+        }
+
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.875rem;
+            flex-shrink: 0;
+        }
+
+        .user-avatar.yongkang { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .user-avatar.chenhaokun { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+        .user-avatar.xwell { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+        .user-avatar.liufeng { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+        .user-avatar.aacedar { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+
+        .user-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .user-name {
+            font-weight: 500;
+            font-size: 0.9rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .user-meta {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 0.125rem;
+        }
+
+        /* ==================== 卡片样式 ==================== */
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 1rem;
+        }
+
+        .card-header {
+            background: var(--bg-tertiary);
+            padding: 0.875rem 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .card-title {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .card-body {
+            padding: 1.25rem;
+        }
+
+        /* ==================== 版本信息卡片 ==================== */
+        .version-cards {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .version-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .version-header {
+            padding: 1rem 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .version-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 600;
+        }
+
+        .version-label.commit { color: var(--accent-purple); }
+        .version-label.require { color: var(--accent-green); }
+
+        .version-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            padding: 0.375rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            font-family: 'SF Mono', Monaco, Consolas, monospace;
+        }
+
+        .version-badge.commit {
+            background: rgba(163, 113, 247, 0.15);
+            color: var(--accent-purple);
+        }
+
+        .version-badge.require {
+            background: rgba(63, 185, 80, 0.15);
+            color: var(--accent-green);
+        }
+
+        .version-body {
+            padding: 1rem 1.25rem;
+        }
+
+        .version-info-item {
+            display: flex;
+            margin-bottom: 0.75rem;
+        }
+
+        .version-info-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .version-info-label {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            min-width: 80px;
+            flex-shrink: 0;
+        }
+
+        .version-info-value {
+            font-size: 0.85rem;
+            color: var(--text-primary);
+            word-break: break-all;
+        }
+
+        .version-info-value.mono {
+            font-family: 'SF Mono', Monaco, Consolas, monospace;
+            font-size: 0.8rem;
+        }
+
+        /* ==================== 统计面板 ==================== */
+        .stats-panel {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 1.25rem;
+            text-align: center;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--text-muted);
+        }
+
+        .stat-value {
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-value.total { color: var(--accent-blue); }
+        .stat-value.identical { color: var(--accent-green); }
+        .stat-value.different { color: var(--accent-yellow); }
+        .stat-value.missing { color: var(--accent-red); }
+        .stat-value.similarity { color: var(--accent-cyan); }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .similarity-bar-container {
+            margin-top: 0.75rem;
+        }
+
+        .similarity-bar {
+            height: 6px;
+            background: var(--bg-primary);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .similarity-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.6s ease;
+        }
+
+        .similarity-fill.high { background: var(--accent-green); }
+        .similarity-fill.medium { background: var(--accent-yellow); }
+        .similarity-fill.low { background: var(--accent-red); }
+
+        /* ==================== 文件列表 ==================== */
+        .file-filter-bar {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .filter-btn {
+            padding: 0.5rem 1rem;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .filter-btn:hover {
+            border-color: var(--text-secondary);
+            color: var(--text-primary);
+        }
+
+        .filter-btn.active {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: #fff;
+        }
+
+        .file-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+            transition: background 0.15s;
+            cursor: pointer;
+        }
+
+        .file-item:hover {
+            background: var(--bg-hover);
+        }
+
+        .file-item:last-child {
+            border-bottom: none;
+        }
+
+        .file-icon {
+            width: 20px;
+            height: 20px;
+            margin-right: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .file-name {
+            flex: 1;
+            font-family: 'SF Mono', Monaco, Consolas, monospace;
+            font-size: 0.85rem;
+            color: var(--accent-blue);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .file-similarity {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-right: 0.75rem;
+            font-family: 'SF Mono', Monaco, Consolas, monospace;
+        }
+
+        .file-status {
+            padding: 0.25rem 0.625rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        .file-status.identical {
+            background: rgba(63, 185, 80, 0.15);
+            color: var(--accent-green);
+        }
+
+        .file-status.different {
+            background: rgba(210, 153, 34, 0.15);
+            color: var(--accent-yellow);
+        }
+
+        .file-status.missing {
+            background: rgba(248, 81, 73, 0.15);
+            color: var(--accent-red);
+        }
+
+        /* ==================== 空状态 ==================== */
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+        }
+
+        .empty-icon {
+            width: 80px;
+            height: 80px;
+            color: var(--text-muted);
+            margin-bottom: 1.5rem;
+            opacity: 0.5;
+        }
+
+        .empty-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .empty-description {
+            color: var(--text-secondary);
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        /* ==================== 加载动画 ==================== */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .loading-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .loading-content {
+            text-align: center;
+        }
+
+        .loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        /* ==================== 模态框 ==================== */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.75);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-content {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            width: 90%;
+            max-width: 1000px;
+            max-height: 80vh;
+            overflow: hidden;
+            transform: scale(0.95);
+            transition: transform 0.3s;
+        }
+
+        .modal-overlay.active .modal-content {
+            transform: scale(1);
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-tertiary);
+        }
+
+        .modal-title {
+            font-weight: 600;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .modal-close {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+        }
+
+        .modal-close:hover {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: 0;
+            max-height: calc(80vh - 60px);
+            overflow-y: auto;
+        }
+
+        /* ==================== Diff 视图 ==================== */
+        .diff-header {
+            display: flex;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .diff-label {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .diff-label:first-child {
+            border-right: 1px solid var(--border-color);
+            color: var(--accent-green);
+        }
+
+        .diff-label:last-child {
+            color: var(--accent-purple);
+        }
+
+        .diff-content {
+            display: flex;
+            font-family: 'SF Mono', Monaco, Consolas, monospace;
+            font-size: 0.8rem;
+            line-height: 1.6;
+        }
+
+        .diff-side {
+            flex: 1;
+            overflow-x: auto;
+        }
+
+        .diff-side:first-child {
+            border-right: 1px solid var(--border-color);
+        }
+
+        .diff-line {
+            display: flex;
+            min-height: 24px;
+        }
+
+        .line-num {
+            width: 50px;
+            padding: 0 0.75rem;
+            text-align: right;
+            color: var(--text-muted);
+            background: rgba(0, 0, 0, 0.2);
+            user-select: none;
+            flex-shrink: 0;
+        }
+
+        .line-content {
+            flex: 1;
+            padding: 0 1rem;
+            white-space: pre;
+        }
+
+        .line-content.added {
+            background: rgba(63, 185, 80, 0.15);
+        }
+
+        .line-content.removed {
+            background: rgba(248, 81, 73, 0.15);
+        }
+
+        .line-content.modified {
+            background: rgba(210, 153, 34, 0.15);
+        }
+
+        /* ==================== 响应式 ==================== */
+        @media (max-width: 1024px) {
+            .main-container {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+            }
+
+            .version-cards {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-panel {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .stats-panel {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        /* ==================== 滚动条 ==================== */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+
+        /* ==================== 时间线视图 ==================== */
+        .timeline-view {
+            padding: 1.5rem;
+        }
+
+        .timeline {
+            position: relative;
+            padding-left: 2rem;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 0.5rem;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: var(--border-color);
+        }
+
+        .timeline-item {
+            position: relative;
+            padding-bottom: 1.5rem;
+        }
+
+        .timeline-dot {
+            position: absolute;
+            left: -2rem;
+            top: 0.25rem;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            border: 2px solid var(--bg-secondary);
+        }
+
+        .timeline-dot.commit {
+            background: var(--accent-purple);
+        }
+
+        .timeline-dot.snapshot {
+            background: var(--accent-green);
+        }
+
+        .timeline-time {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.375rem;
+        }
+
+        .timeline-card {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.875rem 1rem;
+        }
+
+        .timeline-card-title {
+            font-weight: 500;
+            font-size: 0.9rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .timeline-card-desc {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar">
+        <a class="navbar-brand" href="#">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+            </svg>
+            Repo Reconstruction Evaluation
+            <span class="navbar-version">V2</span>
+        </a>
+        <div>
+            <button class="btn btn-outline" onclick="showDemoData()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+                </svg>
+                加载演示数据
+            </button>
+        </div>
+    </nav>
+
+    <!-- 主容器 -->
+    <div class="main-container">
+        <!-- 侧边栏 -->
+        <div class="sidebar">
+            <!-- 查询表单 -->
+            <div class="form-section">
+                <div class="section-title">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
+                    </svg>
+                    查询参数
+                </div>
+
+                <form id="queryForm">
+                    <div class="form-group">
+                        <label class="form-label">User ID</label>
+                        <select class="form-control" id="userSelect" required>
+                            <option value="">选择用户...</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">GitHub 用户名</label>
+                        <input type="text" class="form-control" id="githubUsername" 
+                               placeholder="例如: xwellxia" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">查询时间点</label>
+                        <input type="datetime-local" class="form-control" id="targetTime" required>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-block" id="queryBtn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
+                        </svg>
+                        执行查询
+                    </button>
+                </form>
+            </div>
+
+            <hr style="border-color: var(--border-color); margin: 1.5rem 0;">
+
+            <!-- 已知用户 -->
+            <div class="section-title">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M15 14s1 0 1-1-1-4-5-4-5 3-5 4 1 1 1 1h8zm-7.978-1A.261.261 0 0 1 7 12.996c.001-.264.167-1.03.76-1.72C8.312 10.629 9.282 10 11 10c1.717 0 2.687.63 3.24 1.276.593.69.758 1.457.76 1.72l-.008.002a.274.274 0 0 1-.014.002H7.022zM11 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm3-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM6.936 9.28a5.88 5.88 0 0 0-1.23-.247A7.35 7.35 0 0 0 5 9c-4 0-5 3-5 4 0 .667.333 1 1 1h4.216A2.238 2.238 0 0 1 5 13c0-1.01.377-2.042 1.09-2.904.243-.294.526-.569.846-.816zM4.92 10A5.493 5.493 0 0 0 4 13H1c0-.26.164-1.03.76-1.724.545-.636 1.492-1.256 3.16-1.275zM1.5 5.5a3 3 0 1 1 6 0 3 3 0 0 1-6 0zm3-2a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/>
+                </svg>
+                已知用户
+            </div>
+
+            <div class="user-list" id="userList">
+                <!-- 动态填充 -->
+            </div>
+        </div>
+
+        <!-- 主内容区 -->
+        <div class="content-area">
+            <!-- 空状态 -->
+            <div id="emptyState" class="empty-state">
+                <svg class="empty-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                </svg>
+                <h3 class="empty-title">开始查询版本对比</h3>
+                <p class="empty-description">
+                    在左侧选择用户、输入GitHub用户名和目标时间，点击"执行查询"开始版本对比分析
+                </p>
+            </div>
+
+            <!-- 结果区域 -->
+            <div id="resultArea" style="display: none;">
+                <!-- 版本信息卡片 -->
+                <div class="version-cards">
+                    <!-- Commit 版本 -->
+                    <div class="version-card">
+                        <div class="version-header">
+                            <div class="version-label commit">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+                                    <path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/>
+                                </svg>
+                                Commit 版本
+                            </div>
+                            <span class="version-badge commit" id="commitBadge">-</span>
+                        </div>
+                        <div class="version-body">
+                            <div class="version-info-item">
+                                <span class="version-info-label">提交时间</span>
+                                <span class="version-info-value" id="commitTime">-</span>
+                            </div>
+                            <div class="version-info-item">
+                                <span class="version-info-label">提交者</span>
+                                <span class="version-info-value" id="commitAuthor">-</span>
+                            </div>
+                            <div class="version-info-item">
+                                <span class="version-info-label">提交信息</span>
+                                <span class="version-info-value" id="commitMessage">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Require 版本 -->
+                    <div class="version-card">
+                        <div class="version-header">
+                            <div class="version-label require">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+                                    <path d="M12.643 15C13.979 15 15 13.845 15 12.5V5H1v7.5C1 13.845 2.021 15 3.357 15h9.286zM5.5 7h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1 0-1zM.8 1a.8.8 0 0 0-.8.8V3a.8.8 0 0 0 .8.8h14.4A.8.8 0 0 0 16 3V1.8a.8.8 0 0 0-.8-.8H.8z"/>
+                                </svg>
+                                Require 版本 (快照)
+                            </div>
+                            <span class="version-badge require" id="snapshotBadge">-</span>
+                        </div>
+                        <div class="version-body">
+                            <div class="version-info-item">
+                                <span class="version-info-label">请求ID</span>
+                                <span class="version-info-value mono" id="requestId">-</span>
+                            </div>
+                            <div class="version-info-item">
+                                <span class="version-info-label">文件数量</span>
+                                <span class="version-info-value" id="fileCount">-</span>
+                            </div>
+                            <div class="version-info-item">
+                                <span class="version-info-label">还原状态</span>
+                                <span class="version-info-value" id="restoreStatus">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 统计面板 -->
+                <div class="stats-panel">
+                    <div class="stat-card">
+                        <div class="stat-value total" id="statTotal">0</div>
+                        <div class="stat-label">总文件数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value identical" id="statIdentical">0</div>
+                        <div class="stat-label">完全一致</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value different" id="statDifferent">0</div>
+                        <div class="stat-label">存在差异</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value missing" id="statMissing">0</div>
+                        <div class="stat-label">缺失文件</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value similarity" id="statSimilarity">0%</div>
+                        <div class="stat-label">平均相似度</div>
+                        <div class="similarity-bar-container">
+                            <div class="similarity-bar">
+                                <div class="similarity-fill high" id="similarityBar" style="width: 0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 文件列表 -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M4 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H4zm0 1h8a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1z"/>
+                                <path d="M4.5 10.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zm0-2a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zm0-2a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zm0-2a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5z"/>
+                            </svg>
+                            文件对比详情
+                        </h3>
+                        <div class="file-filter-bar">
+                            <button class="filter-btn active" data-filter="all" onclick="filterFiles('all', this)">全部</button>
+                            <button class="filter-btn" data-filter="different" onclick="filterFiles('different', this)">有差异</button>
+                            <button class="filter-btn" data-filter="missing" onclick="filterFiles('missing', this)">缺失</button>
+                            <button class="filter-btn" data-filter="identical" onclick="filterFiles('identical', this)">一致</button>
+                        </div>
+                    </div>
+                    <div class="card-body" style="padding: 0;">
+                        <div class="file-list" id="fileList">
+                            <!-- 动态填充 -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 加载遮罩 -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <div class="loading-text" id="loadingText">正在查询...</div>
+        </div>
+    </div>
+
+    <!-- 文件详情模态框 -->
+    <div class="modal-overlay" id="fileModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M5.5 7a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1h-5zM5 9.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5z"/>
+                        <path d="M9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4.5L9.5 0zm0 1v2A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5z"/>
+                    </svg>
+                    <span id="modalFileName">-</span>
+                </h3>
+                <button class="modal-close" onclick="closeModal()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="diff-header">
+                    <div class="diff-label">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M12.643 15C13.979 15 15 13.845 15 12.5V5H1v7.5C1 13.845 2.021 15 3.357 15h9.286zM5.5 7h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1 0-1z"/>
+                        </svg>
+                        还原版本 (Require)
+                    </div>
+                    <div class="diff-label">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                            <path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/>
+                        </svg>
+                        Commit 版本
+                    </div>
+                </div>
+                <div class="diff-content" id="diffContent">
+                    <!-- 动态填充 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== 配置和状态 ====================
+        const USERS = [
+            {
+                user_id: '19802552-04bf-4173-acd4-bcbd25eaa9bd',
+                name: '杨永康',
+                github: 'yangyongkang',
+                avatar_class: 'yongkang',
+                snapshot_count: 152,
+                date_range: '20260202 - 20260207'
+            },
+            {
+                user_id: 'e6e42a7f-a0ee-4e29-8f63-f3faefc54e24',
+                name: 'chenhaokun',
+                github: 'haokunchen',
+                avatar_class: 'chenhaokun',
+                snapshot_count: 58,
+                date_range: '20260202 - 20260205'
+            },
+            {
+                user_id: '2e1fb58b-ffa3-487f-86a6-eb613f42bc65',
+                name: 'Xwell',
+                github: 'xwellxia',
+                avatar_class: 'xwell',
+                snapshot_count: 28,
+                date_range: '20260202 - 20260204'
+            },
+            {
+                user_id: '83902969-394d-442b-9b65-2c9ac41b60f1',
+                name: '刘峰',
+                github: 'neolscarlet',
+                avatar_class: 'liufeng',
+                snapshot_count: 19,
+                date_range: '20260203 - 20260205'
+            },
+            {
+                user_id: '3ad75b0f-ce21-41c1-8ed1-3c54b9c1c84b',
+                name: 'aacedar',
+                github: 'aacedar',
+                avatar_class: 'aacedar',
+                snapshot_count: 20,
+                date_range: '20260202 - 20260204'
+            }
+        ];
+
+        let state = {
+            currentResult: null,
+            currentFiles: []
+        };
+
+        // ==================== 工具函数 ====================
+        function showLoading(text = '正在加载...') {
+            document.getElementById('loadingText').textContent = text;
+            document.getElementById('loadingOverlay').classList.add('active');
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingOverlay').classList.remove('active');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // ==================== 渲染函数 ====================
+        function renderUserList() {
+            const container = document.getElementById('userList');
+            container.innerHTML = USERS.map(user => `
+                <div class="user-item" onclick="selectUser('${user.user_id}', '${user.github}')">
+                    <div class="user-avatar ${user.avatar_class}">${user.name.charAt(0)}</div>
+                    <div class="user-info">
+                        <div class="user-name">${user.name}</div>
+                        <div class="user-meta">@${user.github} · ${user.snapshot_count} 快照</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function populateUserSelect() {
+            const select = document.getElementById('userSelect');
+            select.innerHTML = '<option value="">选择用户...</option>' +
+                USERS.map(user => 
+                    `<option value="${user.user_id}" data-github="${user.github}">${user.name} (${user.user_id.substring(0, 8)}...)</option>`
+                ).join('');
+        }
+
+        function selectUser(userId, github) {
+            document.getElementById('userSelect').value = userId;
+            document.getElementById('githubUsername').value = github;
+            
+            // 更新用户列表高亮
+            document.querySelectorAll('.user-item').forEach(item => item.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+        }
+
+        function renderResult(data) {
+            document.getElementById('emptyState').style.display = 'none';
+            document.getElementById('resultArea').style.display = 'block';
+
+            // Commit版本信息
+            if (data.commit) {
+                document.getElementById('commitBadge').textContent = data.commit.short_hash;
+                document.getElementById('commitTime').textContent = data.commit.date;
+                document.getElementById('commitAuthor').textContent = data.commit.author;
+                document.getElementById('commitMessage').textContent = data.commit.message;
+            }
+
+            // 快照版本信息
+            if (data.snapshot) {
+                document.getElementById('snapshotBadge').textContent = data.snapshot.date;
+                document.getElementById('requestId').textContent = data.snapshot.request_id;
+                document.getElementById('fileCount').textContent = data.snapshot.file_count;
+                document.getElementById('restoreStatus').innerHTML = 
+                    data.snapshot.restored 
+                        ? '<span style="color: var(--accent-green);">✓ 成功</span>' 
+                        : '<span style="color: var(--accent-red);">✗ 失败</span>';
+            }
+
+            // 统计信息
+            if (data.stats) {
+                document.getElementById('statTotal').textContent = data.stats.total;
+                document.getElementById('statIdentical').textContent = data.stats.identical;
+                document.getElementById('statDifferent').textContent = data.stats.different;
+                document.getElementById('statMissing').textContent = data.stats.missing;
+                
+                const similarity = data.stats.similarity;
+                document.getElementById('statSimilarity').textContent = similarity.toFixed(1) + '%';
+                const bar = document.getElementById('similarityBar');
+                bar.style.width = similarity + '%';
+                bar.className = 'similarity-fill ' + 
+                    (similarity >= 80 ? 'high' : similarity >= 50 ? 'medium' : 'low');
+            }
+
+            // 文件列表
+            if (data.files) {
+                state.currentFiles = data.files;
+                renderFileList(data.files);
+            }
+        }
+
+        function renderFileList(files) {
+            const container = document.getElementById('fileList');
+            
+            // 排序：different > missing > identical
+            const statusOrder = { 'different': 0, 'missing': 1, 'identical': 2 };
+            files.sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
+
+            container.innerHTML = files.map(file => {
+                const statusText = file.status === 'identical' ? '一致' :
+                                  file.status === 'different' ? '差异' : '缺失';
+                const simText = file.status === 'different' ? `${(file.similarity * 100).toFixed(1)}%` : '';
+                
+                return `
+                    <div class="file-item" data-status="${file.status}" onclick="showFileDetail('${escapeHtml(file.path)}')">
+                        <svg class="file-icon" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M5.5 7a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1h-5zM5 9.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5z"/>
+                            <path d="M9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4.5L9.5 0zm0 1v2A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5z"/>
+                        </svg>
+                        <span class="file-name">${escapeHtml(file.path)}</span>
+                        ${simText ? `<span class="file-similarity">${simText}</span>` : ''}
+                        <span class="file-status ${file.status}">${statusText}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function filterFiles(status, btn) {
+            // 更新按钮状态
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            // 过滤文件
+            document.querySelectorAll('.file-item').forEach(item => {
+                if (status === 'all') {
+                    item.style.display = '';
+                } else {
+                    item.style.display = item.dataset.status === status ? '' : 'none';
+                }
+            });
+        }
+
+        function showFileDetail(path) {
+            const file = state.currentFiles.find(f => f.path === path);
+            if (!file) return;
+
+            document.getElementById('modalFileName').textContent = path;
+            
+            const diffContent = document.getElementById('diffContent');
+            if (file.diff) {
+                diffContent.innerHTML = `
+                    <div style="padding: 1.5rem; font-family: 'SF Mono', Monaco, Consolas, monospace; font-size: 0.8rem; white-space: pre-wrap; line-height: 1.6; color: var(--text-primary);">${escapeHtml(file.diff)}</div>
+                `;
+            } else {
+                diffContent.innerHTML = `
+                    <div style="padding: 3rem; text-align: center; color: var(--text-secondary);">
+                        ${file.status === 'identical' ? '✓ 文件内容完全一致' : '暂无详细diff数据'}
+                    </div>
+                `;
+            }
+
+            document.getElementById('fileModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('fileModal').classList.remove('active');
+        }
+
+        // ==================== 演示数据 ====================
+        function showDemoData() {
+            showLoading('正在加载演示数据...');
+            
+            setTimeout(() => {
+                const demoData = {
+                    commit: {
+                        hash: 'a1b2c3d4e5f6',
+                        short_hash: 'a1b2c3d',
+                        date: '2026-02-04 14:25:33',
+                        author: 'xwellxia',
+                        message: 'feat: add new feature for data processing'
+                    },
+                    snapshot: {
+                        date: '20260204',
+                        request_id: '258095388aed4db486b34d389861cd90',
+                        file_count: 42,
+                        restored: true
+                    },
+                    stats: {
+                        total: 42,
+                        identical: 35,
+                        different: 5,
+                        missing: 2,
+                        similarity: 94.5
+                    },
+                    files: [
+                        { path: 'src/main.py', status: 'identical', similarity: 1.0 },
+                        { path: 'src/utils/helper.py', status: 'different', similarity: 0.92, diff: '--- a/src/utils/helper.py\n+++ b/src/utils/helper.py\n@@ -10,3 +10,5 @@\n def helper():\n-    return "old"\n+    return "new"\n+    # Added comment' },
+                        { path: 'src/api/routes.py', status: 'different', similarity: 0.85, diff: '--- a/src/api/routes.py\n+++ b/src/api/routes.py\n@@ -1,5 +1,7 @@\n from flask import Flask\n+from flask_cors import CORS\n \n app = Flask(__name__)\n+CORS(app)' },
+                        { path: 'src/models/user.py', status: 'identical', similarity: 1.0 },
+                        { path: 'src/models/product.py', status: 'identical', similarity: 1.0 },
+                        { path: 'config/settings.py', status: 'different', similarity: 0.95, diff: '--- a/config/settings.py\n+++ b/config/settings.py\n@@ -5,1 +5,1 @@\n-DEBUG = True\n+DEBUG = False' },
+                        { path: 'tests/test_main.py', status: 'missing', similarity: 0 },
+                        { path: 'docs/README.md', status: 'missing', similarity: 0 },
+                        { path: 'src/services/auth.py', status: 'identical', similarity: 1.0 },
+                        { path: 'src/services/payment.py', status: 'different', similarity: 0.88, diff: '--- a/src/services/payment.py\n+++ b/src/services/payment.py\n@@ -20,3 +20,6 @@\n def process_payment(amount):\n     # Process payment logic\n+    if amount <= 0:\n+        raise ValueError("Invalid amount")\n     return True' },
+                        { path: 'src/database/connection.py', status: 'different', similarity: 0.91, diff: '--- a/src/database/connection.py\n+++ b/src/database/connection.py\n@@ -1,4 +1,5 @@\n import pymysql\n+import os\n \n def get_connection():\n-    return pymysql.connect(host="localhost")\n+    return pymysql.connect(host=os.getenv("DB_HOST", "localhost"))' },
+                        { path: 'requirements.txt', status: 'identical', similarity: 1.0 },
+                        { path: 'setup.py', status: 'identical', similarity: 1.0 },
+                    ]
+                };
+
+                // 添加更多一致的文件
+                for (let i = 1; i <= 30; i++) {
+                    demoData.files.push({
+                        path: `src/modules/module_${i}.py`,
+                        status: 'identical',
+                        similarity: 1.0
+                    });
+                }
+
+                state.currentResult = demoData;
+                renderResult(demoData);
+                hideLoading();
+            }, 800);
+        }
+
+        // ==================== 事件处理 ====================
+        document.getElementById('queryForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            showDemoData();
+        });
+
+        document.getElementById('userSelect').addEventListener('change', (e) => {
+            const selectedOption = e.target.selectedOptions[0];
+            if (selectedOption && selectedOption.dataset.github) {
+                document.getElementById('githubUsername').value = selectedOption.dataset.github;
+            }
+        });
+
+        // 模态框点击外部关闭
+        document.getElementById('fileModal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('fileModal')) {
+                closeModal();
+            }
+        });
+
+        // ESC关闭模态框
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        });
+
+        // ==================== 初始化 ====================
+        document.addEventListener('DOMContentLoaded', () => {
+            renderUserList();
+            populateUserSelect();
+            
+            // 设置默认时间
+            const now = new Date();
+            const localTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+            document.getElementById('targetTime').value = localTime.toISOString().slice(0, 16);
+        });
+    </script>
+</body>
+</html>
