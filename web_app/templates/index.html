@@ -430,6 +430,9 @@
                     <button class="view-tab active" data-view="comparison" onclick="switchView('comparison', this)">
                         <i class="bi bi-layout-split"></i> 仓库对比
                     </button>
+                    <button class="view-tab" data-view="original_reposhot" onclick="switchView('original_reposhot', this)">
+                        <i class="bi bi-archive"></i> 还原前 <span class="badge" id="originalCount">0</span>
+                    </button>
                     <button class="view-tab" data-view="request_changes" onclick="switchView('request_changes', this)">
                         <i class="bi bi-journal-code"></i> Request 变更 <span class="badge" id="changesCount">0</span>
                     </button>
@@ -525,10 +528,14 @@
             filteredFiles: [],     // 过滤后的文件列表
             selectedFileIndex: -1, // 当前选中的文件在 filteredFiles 中的索引
             currentFilter: 'all',
-            currentView: 'comparison',  // 当前视图：comparison | request_changes
+            currentView: 'comparison',  // 当前视图：comparison | request_changes | original_reposhot
             requestChanges: [],         // request 的变更列表
             filteredChanges: [],        // 过滤后的变更列表
             selectedChangeIndex: -1,    // 当前选中的变更在 filteredChanges 中的索引
+            originalFiles: [],          // 原始快照与真实仓库的对比文件列表
+            filteredOriginalFiles: [],  // 过滤后的原始快照对比文件列表
+            selectedOriginalIndex: -1,  // 当前选中的原始文件索引
+            originalCurrentFilter: 'all', // 原始快照视图当前过滤条件
         };
 
         const API_BASE = '';
@@ -673,6 +680,19 @@
                 state.filteredChanges = [];
                 document.getElementById('changesCount').textContent = '0';
             }
+
+            // 处理 original_comparison 数据（原始快照与真实仓库的对比）
+            if (data.original_comparison && data.original_comparison.file_details && data.original_comparison.file_details.length > 0) {
+                state.originalFiles = data.original_comparison.file_details;
+                state.filteredOriginalFiles = [...state.originalFiles];
+                state.selectedOriginalIndex = -1;
+                state.originalCurrentFilter = 'all';
+                document.getElementById('originalCount').textContent = state.originalFiles.length;
+            } else {
+                state.originalFiles = [];
+                state.filteredOriginalFiles = [];
+                document.getElementById('originalCount').textContent = '0';
+            }
         }
 
         function renderFileTree() {
@@ -736,6 +756,11 @@
                 renderChangesTree();
                 updateFilesHeaderForChanges();
                 showSelectChangeHint();
+            } else if (view === 'original_reposhot') {
+                // 显示还原前仓库视图
+                renderOriginalFilesTree();
+                updateFilesHeaderForOriginal();
+                showSelectOriginalHint();
             }
         }
 
@@ -897,6 +922,177 @@
             }
         }
 
+        // ==================== 还原前仓库视图（与真实仓库对比）====================
+        function updateFilesHeaderForOriginal() {
+            document.getElementById('filesHeaderTitle').textContent = `ORIGINAL vs ACTUAL (${state.originalFiles.length})`;
+            // 使用与仓库对比视图相同的过滤按钮
+            const toolbar = document.querySelector('.files-toolbar');
+            toolbar.innerHTML = `
+                <button class="${state.originalCurrentFilter === 'all' ? 'active' : ''}" data-filter="all" onclick="filterOriginalFiles('all', this)">All</button>
+                <button class="${state.originalCurrentFilter === 'different' ? 'active' : ''}" data-filter="different" onclick="filterOriginalFiles('different', this)">Different</button>
+                <button class="${state.originalCurrentFilter === 'missing_in_actual' ? 'active' : ''}" data-filter="missing_in_actual" onclick="filterOriginalFiles('missing_in_actual', this)">Missing</button>
+                <button class="${state.originalCurrentFilter === 'identical' ? 'active' : ''}" data-filter="identical" onclick="filterOriginalFiles('identical', this)">Identical</button>
+            `;
+        }
+
+        function renderOriginalFilesTree() {
+            const c = document.getElementById('fileTree');
+            c.innerHTML = state.filteredOriginalFiles.map((f, idx) => {
+                const statusMap = { 'identical': 'identical', 'different': 'different', 'missing_in_actual': 'missing' };
+                const iconMap = { 'identical': '✓', 'different': '≠', 'missing_in_actual': '✗' };
+                const sc = statusMap[f.status] || '';
+                const icon = iconMap[f.status] || '?';
+                let simBadge = '';
+                if (f.status === 'different') {
+                    const simPct = ((f.similarity || 0) * 100).toFixed(0);
+                    simBadge = `<span class="sim-badge" style="background:rgba(210,153,34,0.2);color:var(--accent-yellow);">${simPct}%</span>`;
+                }
+                const activeClass = idx === state.selectedOriginalIndex ? ' active' : '';
+                return `<div class="file-tree-item status-${sc}${activeClass}" data-idx="${idx}" data-status="${f.status}" onclick="selectOriginalFile(${idx})">
+                    <span class="status-icon">${icon}</span>
+                    <span class="file-name" title="${escapeHtml(f.rel_path)}">${escapeHtml(f.rel_path)}</span>
+                    ${simBadge}
+                </div>`;
+            }).join('');
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        function filterOriginalFiles(status, btn) {
+            document.querySelectorAll('.files-toolbar button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            state.originalCurrentFilter = status;
+            if (status === 'all') {
+                state.filteredOriginalFiles = [...state.originalFiles];
+            } else {
+                state.filteredOriginalFiles = state.originalFiles.filter(f => f.status === status);
+            }
+            state.selectedOriginalIndex = -1;
+            renderOriginalFilesTree();
+            showSelectOriginalHint();
+        }
+
+        function selectOriginalFile(idx) {
+            state.selectedOriginalIndex = idx;
+            // 更新高亮
+            document.querySelectorAll('.file-tree-item').forEach(i => i.classList.remove('active'));
+            const item = document.querySelector(`.file-tree-item[data-idx="${idx}"]`);
+            if (item) item.classList.add('active');
+
+            const file = state.filteredOriginalFiles[idx];
+            if (!file) return;
+
+            renderOriginalFileContent(file, idx);
+        }
+
+        function showSelectOriginalHint() {
+            document.getElementById('selectFileHint').style.display = 'flex';
+            document.getElementById('selectFileHint').querySelector('p').textContent = '从左侧文件列表中选择一个文件查看原始快照与真实仓库的对比';
+            document.getElementById('diffFileHeader').style.display = 'none';
+            document.getElementById('diffColumnHeaders').style.display = 'none';
+            document.getElementById('diffTableWrapper').style.display = 'none';
+        }
+
+        function renderOriginalFileContent(file, idx) {
+            // 隐藏提示
+            document.getElementById('emptyState').style.display = 'none';
+            document.getElementById('selectFileHint').style.display = 'none';
+
+            // 文件头
+            document.getElementById('diffFileHeader').style.display = '';
+            document.getElementById('diffFilePath').textContent = file.rel_path;
+            const badge = document.getElementById('diffFileBadge');
+            const badgeMap = {
+                'identical': ['IDENTICAL', 'identical'],
+                'different': ['DIFFERENT', 'different'],
+                'missing_in_actual': ['MISSING', 'missing'],
+            };
+            const [badgeText, badgeClass] = badgeMap[file.status] || ['UNKNOWN', ''];
+            badge.textContent = badgeText;
+            badge.className = 'diff-file-badge ' + badgeClass;
+
+            // 导航索引
+            document.getElementById('fileNavIndex').textContent = `${idx + 1}/${state.filteredOriginalFiles.length}`;
+
+            // 列标题（更新为原始快照 vs 真实仓库）
+            document.getElementById('diffColumnHeaders').style.display = '';
+            document.getElementById('diffColumnHeaders').innerHTML = `
+                <div class="diff-col-label"><i class="bi bi-archive"></i> 原始快照 (还原前)</div>
+                <div class="diff-col-label"><i class="bi bi-folder2-open"></i> 真实仓库 (Actual)</div>
+            `;
+            document.getElementById('diffTableWrapper').style.display = '';
+
+            const tbody = document.getElementById('diffTableBody');
+
+            // 使用 restored_content 字段（后端复用了这个字段名）
+            const originalContent = file.restored_content || '';
+            const actualContent = file.actual_content || '';
+
+            if (file.status === 'identical') {
+                const lineCount = originalContent ? originalContent.split('\n').length : 0;
+                tbody.innerHTML = '';
+                document.getElementById('diffTableWrapper').innerHTML = `<div class="identical-notice"><i class="bi bi-check-circle"></i> 文件内容完全一致（${lineCount} 行）</div>`;
+                return;
+            }
+
+            // 恢复 table
+            document.getElementById('diffTableWrapper').innerHTML = '<table class="diff-table"><tbody id="diffTableBody"></tbody></table>';
+            const newTbody = document.getElementById('diffTableBody');
+
+            const linesA = originalContent ? originalContent.split('\n') : [];
+            const linesB = actualContent ? actualContent.split('\n') : [];
+
+            if (file.status === 'missing_in_actual') {
+                // 只有左边（原始快照有，真实仓库没有）
+                newTbody.innerHTML = linesA.map((line, i) =>
+                    `<tr><td class="line-num">${i+1}</td><td class="line-content line-removed">${escapeHtml(line)}</td>` +
+                    `<td class="line-num"></td><td class="line-content line-empty"></td></tr>`
+                ).join('');
+                return;
+            }
+
+            // different: 逐行对比（与仓库对比视图使用相同逻辑）
+            const aligned = computeLineDiffs(linesA, linesB);
+            let leftNum = 0, rightNum = 0;
+            const rows = [];
+            for (const [leftLine, rightLine, leftType, rightType] of aligned) {
+                if (leftType !== 'empty') leftNum++;
+                if (rightType !== 'empty') rightNum++;
+                const lNumStr = leftType !== 'empty' ? leftNum : '';
+                const rNumStr = rightType !== 'empty' ? rightNum : '';
+
+                let lHtml, rHtml, lClass, rClass;
+                if (leftType === 'modified' && rightType === 'modified') {
+                    [lHtml, rHtml] = renderInlineDiff(leftLine, rightLine);
+                    lClass = 'line-modified';
+                    rClass = 'line-modified';
+                } else {
+                    lHtml = escapeHtml(leftLine);
+                    rHtml = escapeHtml(rightLine);
+                    const classMap = { 'equal': 'line-equal', 'removed': 'line-removed', 'modified': 'line-modified', 'empty': 'line-empty', 'added': 'line-added' };
+                    lClass = classMap[leftType] || '';
+                    rClass = classMap[rightType] || '';
+                }
+
+                rows.push(`<tr><td class="line-num">${lNumStr}</td><td class="line-content ${lClass}">${lHtml}</td>` +
+                           `<td class="line-num">${rNumStr}</td><td class="line-content ${rClass}">${rHtml}</td></tr>`);
+            }
+            newTbody.innerHTML = rows.join('');
+        }
+
+        function navigateOriginalFile(delta) {
+            const newIdx = state.selectedOriginalIndex + delta;
+            if (newIdx >= 0 && newIdx < state.filteredOriginalFiles.length) {
+                selectOriginalFile(newIdx);
+                const item = document.querySelector(`.file-tree-item[data-idx="${newIdx}"]`);
+                if (item) item.scrollIntoView({ block: 'nearest' });
+            }
+        }
+
         function selectFile(idx) {
             state.selectedFileIndex = idx;
             // 更新高亮
@@ -913,6 +1109,10 @@
         function navigateFile(delta) {
             if (state.currentView === 'request_changes') {
                 navigateChange(delta);
+                return;
+            }
+            if (state.currentView === 'original_reposhot') {
+                navigateOriginalFile(delta);
                 return;
             }
             const newIdx = state.selectedFileIndex + delta;
@@ -954,8 +1154,12 @@
             // 导航索引
             document.getElementById('fileNavIndex').textContent = `${idx + 1}/${state.filteredFiles.length}`;
 
-            // 列标题
+            // 列标题（还原版本 vs 真实仓库）
             document.getElementById('diffColumnHeaders').style.display = '';
+            document.getElementById('diffColumnHeaders').innerHTML = `
+                <div class="diff-col-label"><i class="bi bi-archive"></i> 还原版本 (Restored)</div>
+                <div class="diff-col-label"><i class="bi bi-folder2-open"></i> 真实仓库 (Actual)</div>
+            `;
             document.getElementById('diffTableWrapper').style.display = '';
 
             const tbody = document.getElementById('diffTableBody');
@@ -1180,9 +1384,14 @@
 
         // 键盘快捷键
         document.addEventListener('keydown', (e) => {
-            const hasItems = state.currentView === 'comparison' 
-                ? state.filteredFiles.length > 0 
-                : state.filteredChanges.length > 0;
+            let hasItems = false;
+            if (state.currentView === 'comparison') {
+                hasItems = state.filteredFiles.length > 0;
+            } else if (state.currentView === 'request_changes') {
+                hasItems = state.filteredChanges.length > 0;
+            } else if (state.currentView === 'original_reposhot') {
+                hasItems = state.filteredOriginalFiles.length > 0;
+            }
             if (!hasItems) return;
             if (e.key === 'ArrowDown' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); navigateFile(1); }
             if (e.key === 'ArrowUp' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); navigateFile(-1); }

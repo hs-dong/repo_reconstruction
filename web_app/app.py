@@ -262,17 +262,17 @@ def checkout_git_version(repo_path: str, commit_hash: str) -> bool:
         return False
 
 
-def restore_snapshot(date: str, user_id: str, request_id: str) -> Tuple[Optional[Dict], List[Dict]]:
+def restore_snapshot(date: str, user_id: str, request_id: str) -> Tuple[Optional[Dict], Optional[Dict], List[Dict]]:
     """
-    还原指定的快照，并返回变更序列
+    还原指定的快照，并返回原始快照和变更序列
     
     Returns:
-        Tuple[Optional[Dict], List[Dict]]: (还原后的仓库, 变更序列)
+        Tuple[Optional[Dict], Optional[Dict], List[Dict]]: (还原后的仓库, 原始快照, 变更序列)
     """
     try:
         reposhot = load_reposhot(CONFIG['reposhot_base'], date, user_id, request_id)
         if not reposhot or not reposhot.get('repo_infos'):
-            return None, []
+            return None, None, []
         
         diffs = load_changes(CONFIG['changes_base'], date, user_id, request_id)
         if diffs:
@@ -280,10 +280,10 @@ def restore_snapshot(date: str, user_id: str, request_id: str) -> Tuple[Optional
         else:
             restored = reposhot
         
-        return restored, diffs
+        return restored, reposhot, diffs
     except Exception as e:
         print(f"Error restoring snapshot: {e}")
-        return None, []
+        return None, None, []
 
 
 def extract_request_changes(diffs: List[Dict]) -> List[Dict]:
@@ -340,6 +340,40 @@ def compare_versions(restored_repo: Dict, actual_repo_path: str) -> Dict:
         return results
     except Exception as e:
         print(f"Error comparing versions: {e}")
+        return {'error': str(e)}
+
+
+def compare_original_with_actual(original_reposhot: Dict, actual_repo_path: str) -> Dict:
+    """
+    对比原始快照（还原前）与真实仓库，同时缓存文件内容以供前端 diff 展示。
+    
+    返回的 file_details 中每个条目增加：
+      - restored_content: 原始快照的文件内容（字段名保持一致以复用前端逻辑）
+      - actual_content: 真实仓库的文件内容
+    """
+    try:
+        actual_files = load_actual_repo(actual_repo_path)
+        original_infos = original_reposhot.get('repo_infos', {})
+        workspace_path = original_reposhot.get('workspace_path', '')
+        
+        results = compare_repos(original_infos, actual_files, workspace_path)
+        
+        # 为每个文件补充内容，用于前端 diff 展示
+        prefix = _detect_prefix(original_infos.keys(), actual_files.keys(), workspace_path)
+        original_rel_map = {}
+        for path, content in original_infos.items():
+            rel_path = _strip_prefix(path, prefix)
+            original_rel_map[rel_path] = content
+        
+        for detail in results.get('file_details', []):
+            rel_path = detail.get('rel_path', '')
+            # 字段名用 restored_content 以复用前端逻辑
+            detail['restored_content'] = original_rel_map.get(rel_path, '')
+            detail['actual_content'] = actual_files.get(rel_path, '')
+        
+        return results
+    except Exception as e:
+        print(f"Error comparing original with actual: {e}")
         return {'error': str(e)}
 
 
@@ -473,9 +507,10 @@ def query_versions():
     # 4. 还原快照
     restore_error = None
     restored_repo = None
+    original_reposhot = None
     request_changes = []
     try:
-        restored_repo, diffs = restore_snapshot(
+        restored_repo, original_reposhot, diffs = restore_snapshot(
             nearest_snapshot['date'],
             user_id,
             nearest_snapshot['request_id']
@@ -493,6 +528,15 @@ def query_versions():
     # TODO: 暂时固定，待实际数据就绪后改为动态查找
     actual_repo_path = os.path.join(CONFIG['github_repos_base'], 'EchoCraft_aacedar')
     
+    # 对比原始快照（还原前）与真实仓库
+    original_comparison = None
+    if original_reposhot:
+        try:
+            original_comparison = compare_original_with_actual(original_reposhot, actual_repo_path)
+        except Exception as e:
+            print(f"Error comparing original with actual: {e}", flush=True)
+            original_comparison = {'error': str(e)}
+
     result = {
         'success': True,
         'query_params': {
@@ -509,6 +553,7 @@ def query_versions():
         'commit_version': nearest_commit,
         'repo_path': actual_repo_path,
         'request_changes': request_changes,  # 该 request 的文件变更详情
+        'original_comparison': original_comparison,  # 原始快照与真实仓库的对比结果
     }
     
     # 5. 如果快照还原成功，直接与本地仓库 EchoCraft_aacedar 对比
@@ -546,7 +591,7 @@ def compare_detailed():
         }), 400
     
     # 1. 还原快照
-    restored_repo, _ = restore_snapshot(snapshot_date, user_id, request_id)
+    restored_repo, _, _ = restore_snapshot(snapshot_date, user_id, request_id)
     if not restored_repo:
         return jsonify({
             'success': False,
