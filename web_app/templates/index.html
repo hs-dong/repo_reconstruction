@@ -388,13 +388,6 @@
             <!-- 版本信息 -->
             <div class="version-info-bar" id="versionInfoBar" style="display: none;">
                 <div class="version-cards">
-                    <div class="version-card commit">
-                        <div class="vc-label"><i class="bi bi-git"></i> Commit 版本</div>
-                        <div class="vc-detail">
-                            <strong id="commitHash">-</strong> · <span id="commitTime">-</span> · <span id="commitAuthor">-</span>
-                        </div>
-                        <div class="vc-detail" style="margin-top:2px;"><span id="commitMessage">-</span></div>
-                    </div>
                     <div class="version-card require">
                         <div class="vc-label"><i class="bi bi-archive"></i> Require 版本 (快照)</div>
                         <div class="vc-detail">
@@ -403,6 +396,13 @@
                         <div class="vc-detail" style="margin-top:2px;">
                             文件数: <strong id="fileCount">-</strong> · 还原: <span id="restoreStatus">-</span>
                         </div>
+                    </div>
+                    <div class="version-card commit">
+                        <div class="vc-label"><i class="bi bi-git"></i> Commit 版本</div>
+                        <div class="vc-detail">
+                            <strong id="commitHash">-</strong> · <span id="commitTime">-</span> · <span id="commitAuthor">-</span>
+                        </div>
+                        <div class="vc-detail" style="margin-top:2px;"><span id="commitMessage">-</span></div>
                     </div>
                 </div>
             </div>
